@@ -28,6 +28,18 @@ struct ComicBook: Identifiable, Codable {
         }
     }
     
+    // Additional initializer for loading from storage
+    init(id: UUID, title: String, fileURL: URL, coverImageData: Data?, currentPageIndex: Int, totalPages: Int, dateAdded: Date, fileSize: Int64) {
+        self.id = id
+        self.title = title
+        self.fileURL = fileURL
+        self.coverImageData = coverImageData
+        self.currentPageIndex = currentPageIndex
+        self.totalPages = totalPages
+        self.dateAdded = dateAdded
+        self.fileSize = fileSize
+    }
+    
     var coverImage: UIImage? {
         guard let data = coverImageData else { return nil }
         return UIImage(data: data)
