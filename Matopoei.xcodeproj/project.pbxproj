@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		488C4DE92E69F3CF00BB945A /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 488C4DE82E69F3CA00BB945A /* .gitignore */; };
 		488C4DEB2E69F42800BB945A /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 488C4DEA2E69F42000BB945A /* README.md */; };
+		488C4DF62E69F55C00BB945A /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 488C4DF52E69F55C00BB945A /* ZIPFoundation */; };
+		488C4DF92E69F57200BB945A /* SDWebImage in Frameworks */ = {isa = PBXBuildFile; productRef = 488C4DF82E69F57200BB945A /* SDWebImage */; };
+		488C4DFB2E69F57200BB945A /* SDWebImageMapKit in Frameworks */ = {isa = PBXBuildFile; productRef = 488C4DFA2E69F57200BB945A /* SDWebImageMapKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +75,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				488C4DF92E69F57200BB945A /* SDWebImage in Frameworks */,
+				488C4DFB2E69F57200BB945A /* SDWebImageMapKit in Frameworks */,
+				488C4DF62E69F55C00BB945A /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,6 +140,9 @@
 			);
 			name = Matopoei;
 			packageProductDependencies = (
+				488C4DF52E69F55C00BB945A /* ZIPFoundation */,
+				488C4DF82E69F57200BB945A /* SDWebImage */,
+				488C4DFA2E69F57200BB945A /* SDWebImageMapKit */,
 			);
 			productName = Matopoei;
 			productReference = 488C4DB22E69F3A500BB945A /* Matopoei.app */;
@@ -217,6 +226,10 @@
 			);
 			mainGroup = 488C4DA92E69F3A500BB945A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				488C4DF42E69F55C00BB945A /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+				488C4DF72E69F57200BB945A /* XCRemoteSwiftPackageReference "SDWebImage" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 488C4DB32E69F3A500BB945A /* Products */;
 			projectDirPath = "";
@@ -582,6 +595,43 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		488C4DF42E69F55C00BB945A /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.19;
+			};
+		};
+		488C4DF72E69F57200BB945A /* XCRemoteSwiftPackageReference "SDWebImage" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SDWebImage/SDWebImage.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.21.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		488C4DF52E69F55C00BB945A /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 488C4DF42E69F55C00BB945A /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
+		488C4DF82E69F57200BB945A /* SDWebImage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 488C4DF72E69F57200BB945A /* XCRemoteSwiftPackageReference "SDWebImage" */;
+			productName = SDWebImage;
+		};
+		488C4DFA2E69F57200BB945A /* SDWebImageMapKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 488C4DF72E69F57200BB945A /* XCRemoteSwiftPackageReference "SDWebImage" */;
+			productName = SDWebImageMapKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 488C4DAA2E69F3A500BB945A /* Project object */;
 }
