@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		488C4DE92E69F3CF00BB945A /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 488C4DE82E69F3CA00BB945A /* .gitignore */; };
+		488C4DEB2E69F42800BB945A /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 488C4DEA2E69F42000BB945A /* README.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		488C4DC92E69F3A700BB945A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +32,8 @@
 		488C4DB22E69F3A500BB945A /* Matopoei.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Matopoei.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		488C4DC82E69F3A700BB945A /* MatopoeiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MatopoeiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		488C4DD22E69F3A700BB945A /* MatopoeiUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MatopoeiUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		488C4DE82E69F3CA00BB945A /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		488C4DEA2E69F42000BB945A /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -88,6 +95,8 @@
 		488C4DA92E69F3A500BB945A = {
 			isa = PBXGroup;
 			children = (
+				488C4DEA2E69F42000BB945A /* README.md */,
+				488C4DE82E69F3CA00BB945A /* .gitignore */,
 				488C4DB42E69F3A500BB945A /* Matopoei */,
 				488C4DCB2E69F3A700BB945A /* MatopoeiTests */,
 				488C4DD52E69F3A700BB945A /* MatopoeiUITests */,
@@ -225,6 +234,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				488C4DE92E69F3CF00BB945A /* .gitignore in Resources */,
+				488C4DEB2E69F42800BB945A /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
