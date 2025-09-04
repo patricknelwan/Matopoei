@@ -41,18 +41,19 @@ class ComicReaderViewController: UIViewController {
     private func setupUI() {
         view.backgroundColor = .black
         
-        // Setup scroll view
+        // Setup scroll view to fill entire view bounds
         scrollView = UIScrollView(frame: view.bounds)
         scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         scrollView.delegate = self
-        scrollView.minimumZoomScale = 0.5
+        scrollView.minimumZoomScale = 1.0  // Changed from 0.5 to 1.0
         scrollView.maximumZoomScale = 4.0
         scrollView.showsVerticalScrollIndicator = false
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.backgroundColor = .black
+        scrollView.contentInsetAdjustmentBehavior = .never // Prevent safe area adjustments
         view.addSubview(scrollView)
         
-        // Setup image view
+        // Setup image view to fill scroll view bounds
         imageView = UIImageView(frame: scrollView.bounds)
         imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         imageView.contentMode = .scaleAspectFit
@@ -172,8 +173,14 @@ class ComicReaderViewController: UIViewController {
         updatePageLabel()
         updateProgress()
         
-        // Reset zoom
+        // Reset zoom to minimum and center the image
         scrollView.zoomScale = scrollView.minimumZoomScale
+        
+        // Ensure imageView frame matches scrollView bounds
+        DispatchQueue.main.async {
+            self.imageView.frame = self.scrollView.bounds
+            self.scrollView.contentSize = self.imageView.frame.size
+        }
         
         // Update reading progress
         delegate?.didUpdateReadingProgress(for: comic, currentPage: currentPageIndex)
@@ -231,6 +238,25 @@ class ComicReaderViewController: UIViewController {
         }
         
         resetHideControlsTimer()
+    }
+    
+    private func centerScrollViewContents() {
+        let boundsSize = scrollView.bounds.size
+        var contentsFrame = imageView.frame
+        
+        if contentsFrame.size.width < boundsSize.width {
+            contentsFrame.origin.x = (boundsSize.width - contentsFrame.size.width) / 2.0
+        } else {
+            contentsFrame.origin.x = 0.0
+        }
+        
+        if contentsFrame.size.height < boundsSize.height {
+            contentsFrame.origin.y = (boundsSize.height - contentsFrame.size.height) / 2.0
+        } else {
+            contentsFrame.origin.y = 0.0
+        }
+        
+        imageView.frame = contentsFrame
     }
     
     private func zoomRectForScale(_ scale: CGFloat, center: CGPoint) -> CGRect {
@@ -337,6 +363,11 @@ extension ComicReaderViewController: UIScrollViewDelegate {
     }
     
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        centerScrollViewContents()
         resetHideControlsTimer()
+    }
+    
+    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        centerScrollViewContents()
     }
 }
