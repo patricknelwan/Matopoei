@@ -1,10 +1,3 @@
-//
-//  AppDelegate.swift
-//  Matopoei
-//
-//  Created by Patrick Nelwan on 04/09/25.
-//
-
 import UIKit
 
 @main

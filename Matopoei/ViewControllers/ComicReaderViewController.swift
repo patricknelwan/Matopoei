@@ -1,9 +1,33 @@
 import UIKit
 
+extension UIImage {
+    func fused(with rightImage: UIImage?) -> UIImage? {
+        guard let rightImage = rightImage else { return self }
+        
+        let combinedWidth = self.size.width + rightImage.size.width
+        let combinedHeight = max(self.size.height, rightImage.size.height)
+        let combinedSize = CGSize(width: combinedWidth, height: combinedHeight)
+        
+        UIGraphicsBeginImageContextWithOptions(combinedSize, false, self.scale)
+        
+        // Draw left page
+        self.draw(in: CGRect(origin: .zero, size: self.size))
+        
+        // Draw right page next to left page
+        rightImage.draw(in: CGRect(origin: CGPoint(x: self.size.width, y: 0), size: rightImage.size))
+        
+        let fusedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        return fusedImage
+    }
+}
+
+
 class ComicReaderViewController: UIViewController {
     
     private var scrollView: UIScrollView!
-    private var imageView: UIImageView!
+    private var mainImageView: UIImageView! // Single image view for both modes
     private var pageLabel: UILabel!
     private var toolbar: UIToolbar!
     private var progressView: UIProgressView!
@@ -11,24 +35,35 @@ class ComicReaderViewController: UIViewController {
     var comic: ComicBook!
     weak var delegate: ComicReaderDelegate?
     
-    // Don't store all pages - load on demand
     private var totalPages: Int = 0
     private var currentPageIndex: Int = 0
+    private var showingDoublePage: Bool = false
     private var hideControlsTimer: Timer?
     private var isControlsVisible = true
+    
+    // Reader settings
+    private var forceDoublePage: Bool? = nil // nil = auto (follow orientation)
     
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        loadComicInfo() // Only load page count, not all pages
+        loadComicInfo()
         setupGestures()
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         currentPageIndex = comic.currentPageIndex
-        loadCurrentPage() // Load only current page
+        updateLayoutForCurrentOrientation()
         resetHideControlsTimer()
+    }
+    
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        
+        coordinator.animate(alongsideTransition: { _ in
+            self.updateLayoutForSize(size)
+        }, completion: nil)
     }
     
     override var prefersStatusBarHidden: Bool {
@@ -42,25 +77,24 @@ class ComicReaderViewController: UIViewController {
     private func setupUI() {
         view.backgroundColor = .black
         
-        // Setup scroll view
+        // Setup scroll view with zoom support
         scrollView = UIScrollView(frame: view.bounds)
         scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         scrollView.delegate = self
         scrollView.minimumZoomScale = 1.0
         scrollView.maximumZoomScale = 4.0
-        scrollView.showsVerticalScrollIndicator = false
         scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
         scrollView.backgroundColor = .black
         scrollView.contentInsetAdjustmentBehavior = .never
         view.addSubview(scrollView)
         
-        // Setup image view
-        imageView = UIImageView(frame: scrollView.bounds)
-        imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        imageView.contentMode = .scaleAspectFit
-        imageView.isUserInteractionEnabled = true
-        imageView.backgroundColor = .black
-        scrollView.addSubview(imageView)
+        // Setup single image view for both single and double page modes
+        mainImageView = UIImageView()
+        mainImageView.contentMode = .scaleAspectFit
+        mainImageView.backgroundColor = .black
+        mainImageView.isUserInteractionEnabled = true
+        scrollView.addSubview(mainImageView)
         
         // Setup controls
         setupToolbar()
@@ -138,45 +172,75 @@ class ComicReaderViewController: UIViewController {
         view.addGestureRecognizer(doubleTapGesture)
         
         tapGesture.require(toFail: doubleTapGesture)
-        
-        // Swipe gestures for page navigation
-        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(nextPage))
-        swipeLeft.direction = .left
-        view.addGestureRecognizer(swipeLeft)
-        
-        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(previousPage))
-        swipeRight.direction = .right
-        view.addGestureRecognizer(swipeRight)
     }
     
-    // FIXED: Load comic info only, not all pages
     private func loadComicInfo() {
         totalPages = comic.totalPages
         updatePageLabel()
         updateProgress()
     }
     
-    // FIXED: Load only the current page
-    private func loadCurrentPage() {
-        guard currentPageIndex >= 0 && currentPageIndex < totalPages else { return }
+    private func updateLayoutForCurrentOrientation() {
+        let size = view.bounds.size
+        updateLayoutForSize(size)
+    }
+    
+    private func updateLayoutForSize(_ size: CGSize) {
+        let isLandscape = size.width > size.height
         
-        print("Loading page \(currentPageIndex + 1) of \(totalPages)")
+        // Determine if we should show double pages
+        if let forced = forceDoublePage {
+            showingDoublePage = forced
+        } else {
+            showingDoublePage = isLandscape // Default: single in portrait, double in landscape
+        }
         
+        configureImageView(for: size)
+        loadCurrentPages()
+        updatePageLabel()
+        updateProgress()
+    }
+    
+    private func configureImageView(for size: CGSize) {
+        scrollView.frame = CGRect(origin: .zero, size: size)
+        scrollView.zoomScale = 1.0
+        
+        // Configure the image view to fill the scroll view
+        mainImageView.frame = CGRect(origin: .zero, size: size)
+        scrollView.contentSize = size
+        
+        // Make sure we're within bounds
+        ensureValidPageIndex()
+    }
+    
+    private func loadCurrentPages() {
         DispatchQueue.global(qos: .userInitiated).async {
-            // Extract only the current page
-            let pageImage = ArchiveProcessor.extractPage(at: self.currentPageIndex, from: self.comic.fileURL)
+            let leftImage = ArchiveProcessor.extractPage(at: self.currentPageIndex, from: self.comic.fileURL)
+            
+            var finalImage: UIImage?
+            
+            if self.showingDoublePage && self.currentPageIndex + 1 < self.totalPages {
+                // Load right page and fuse with left page
+                let rightImage = ArchiveProcessor.extractPage(at: self.currentPageIndex + 1, from: self.comic.fileURL)
+                finalImage = leftImage?.fused(with: rightImage)
+                
+                print("📖 Loaded double page spread: \(self.currentPageIndex + 1)-\(self.currentPageIndex + 2)")
+            } else {
+                // Single page mode
+                finalImage = leftImage
+                print("📄 Loaded single page: \(self.currentPageIndex + 1)")
+            }
             
             DispatchQueue.main.async {
-                if let image = pageImage {
-                    self.imageView.image = image
-                    print("✅ Successfully loaded page \(self.currentPageIndex + 1)")
-                } else {
-                    print("❌ Failed to load page \(self.currentPageIndex + 1)")
+                self.mainImageView.image = finalImage
+                
+                // Adjust image view frame to match image aspect ratio while fitting in scroll view
+                if let image = finalImage {
+                    self.adjustImageViewFrame(for: image)
                 }
                 
                 self.updatePageLabel()
                 self.updateProgress()
-                self.resetZoom()
                 
                 // Update reading progress
                 self.delegate?.didUpdateReadingProgress(for: self.comic, currentPage: self.currentPageIndex)
@@ -184,16 +248,53 @@ class ComicReaderViewController: UIViewController {
         }
     }
     
-    private func resetZoom() {
-        scrollView.zoomScale = scrollView.minimumZoomScale
-        DispatchQueue.main.async {
-            self.imageView.frame = self.scrollView.bounds
-            self.scrollView.contentSize = self.imageView.frame.size
+    private func adjustImageViewFrame(for image: UIImage) {
+        let scrollViewSize = scrollView.bounds.size
+        let imageSize = image.size
+        
+        // Calculate the aspect fit frame
+        let aspectRatio = imageSize.width / imageSize.height
+        let scrollAspectRatio = scrollViewSize.width / scrollViewSize.height
+        
+        var newFrame: CGRect
+        
+        if aspectRatio > scrollAspectRatio {
+            // Image is wider - fit to width
+            let height = scrollViewSize.width / aspectRatio
+            newFrame = CGRect(x: 0, y: (scrollViewSize.height - height) / 2, width: scrollViewSize.width, height: height)
+        } else {
+            // Image is taller - fit to height
+            let width = scrollViewSize.height * aspectRatio
+            newFrame = CGRect(x: (scrollViewSize.width - width) / 2, y: 0, width: width, height: scrollViewSize.height)
         }
+        
+        mainImageView.frame = newFrame
+        scrollView.contentSize = newFrame.size
+    }
+    
+    private func ensureValidPageIndex() {
+        if showingDoublePage {
+            // In double page mode, make sure we're on an even page (left page of spread)
+            if currentPageIndex % 2 != 0 && currentPageIndex > 0 {
+                currentPageIndex -= 1
+            }
+        }
+        
+        // Ensure within bounds
+        currentPageIndex = max(0, min(currentPageIndex, totalPages - 1))
     }
     
     private func updatePageLabel() {
-        pageLabel.text = "Page \(currentPageIndex + 1) of \(totalPages)"
+        if showingDoublePage {
+            let rightPageIndex = min(currentPageIndex + 1, totalPages - 1)
+            if currentPageIndex + 1 < totalPages {
+                pageLabel.text = "Pages \(currentPageIndex + 1)-\(rightPageIndex + 1) of \(totalPages)"
+            } else {
+                pageLabel.text = "Page \(currentPageIndex + 1) of \(totalPages)"
+            }
+        } else {
+            pageLabel.text = "Page \(currentPageIndex + 1) of \(totalPages)"
+        }
     }
     
     private func updateProgress() {
@@ -202,16 +303,25 @@ class ComicReaderViewController: UIViewController {
     }
     
     @objc private func previousPage() {
-        guard currentPageIndex > 0 else { return }
-        currentPageIndex -= 1
-        loadCurrentPage()
+        if showingDoublePage {
+            currentPageIndex = max(0, currentPageIndex - 2)
+        } else {
+            currentPageIndex = max(0, currentPageIndex - 1)
+        }
+        
+        loadCurrentPages()
         resetHideControlsTimer()
     }
     
     @objc private func nextPage() {
-        guard currentPageIndex < totalPages - 1 else { return }
-        currentPageIndex += 1
-        loadCurrentPage()
+        if showingDoublePage {
+            currentPageIndex = min(totalPages - 1, currentPageIndex + 2)
+        } else {
+            currentPageIndex = min(totalPages - 1, currentPageIndex + 1)
+        }
+        
+        ensureValidPageIndex()
+        loadCurrentPages()
         resetHideControlsTimer()
     }
     
@@ -232,11 +342,11 @@ class ComicReaderViewController: UIViewController {
     }
     
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
-        let location = gesture.location(in: imageView)
+        let location = gesture.location(in: mainImageView)
         
         if scrollView.zoomScale == scrollView.minimumZoomScale {
-            // Zoom in
-            let zoomRect = zoomRectForScale(scrollView.maximumZoomScale / 2, center: location)
+            // Zoom in to 2x
+            let zoomRect = zoomRectForScale(min(scrollView.maximumZoomScale, 2.0), center: location)
             scrollView.zoom(to: zoomRect, animated: true)
         } else {
             // Zoom out
@@ -244,25 +354,6 @@ class ComicReaderViewController: UIViewController {
         }
         
         resetHideControlsTimer()
-    }
-    
-    private func centerScrollViewContents() {
-        let boundsSize = scrollView.bounds.size
-        var contentsFrame = imageView.frame
-        
-        if contentsFrame.size.width < boundsSize.width {
-            contentsFrame.origin.x = (boundsSize.width - contentsFrame.size.width) / 2.0
-        } else {
-            contentsFrame.origin.x = 0.0
-        }
-        
-        if contentsFrame.size.height < boundsSize.height {
-            contentsFrame.origin.y = (boundsSize.height - contentsFrame.size.height) / 2.0
-        } else {
-            contentsFrame.origin.y = 0.0
-        }
-        
-        imageView.frame = contentsFrame
     }
     
     private func zoomRectForScale(_ scale: CGFloat, center: CGPoint) -> CGRect {
@@ -310,6 +401,18 @@ class ComicReaderViewController: UIViewController {
     @objc private func showSettings() {
         let alert = UIAlertController(title: "Reading Settings", message: nil, preferredStyle: .actionSheet)
         
+        // Page layout options
+        let currentModeTitle = showingDoublePage ? "Switch to Single Page" : "Switch to Double Page"
+        alert.addAction(UIAlertAction(title: currentModeTitle, style: .default) { _ in
+            self.forceDoublePage = !self.showingDoublePage
+            self.updateLayoutForCurrentOrientation()
+        })
+        
+        alert.addAction(UIAlertAction(title: "Auto Layout (Follow Orientation)", style: .default) { _ in
+            self.forceDoublePage = nil
+            self.updateLayoutForCurrentOrientation()
+        })
+        
         alert.addAction(UIAlertAction(title: "Go to Page...", style: .default) { _ in
             self.showPagePicker()
         })
@@ -348,7 +451,8 @@ class ComicReaderViewController: UIViewController {
             }
             
             self.currentPageIndex = pageNumber - 1
-            self.loadCurrentPage()
+            self.ensureValidPageIndex()
+            self.loadCurrentPages()
         })
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
@@ -362,16 +466,37 @@ class ComicReaderViewController: UIViewController {
 
 // MARK: - UIScrollViewDelegate
 extension ComicReaderViewController: UIScrollViewDelegate {
+    
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return imageView
+        return mainImageView
     }
     
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        // Center the image when zoomed
         centerScrollViewContents()
         resetHideControlsTimer()
     }
     
     func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
         centerScrollViewContents()
+    }
+    
+    private func centerScrollViewContents() {
+        let boundsSize = scrollView.bounds.size
+        var contentsFrame = mainImageView.frame
+        
+        if contentsFrame.size.width < boundsSize.width {
+            contentsFrame.origin.x = (boundsSize.width - contentsFrame.size.width) / 2.0
+        } else {
+            contentsFrame.origin.x = 0.0
+        }
+        
+        if contentsFrame.size.height < boundsSize.height {
+            contentsFrame.origin.y = (boundsSize.height - contentsFrame.size.height) / 2.0
+        } else {
+            contentsFrame.origin.y = 0.0
+        }
+        
+        mainImageView.frame = contentsFrame
     }
 }
