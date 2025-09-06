@@ -3,10 +3,52 @@ import UIKit
 
 class ArchiveProcessor {
     
+    // Extract single page by index (most efficient)
+    static func extractPage(at index: Int, from url: URL) -> UIImage? {
+        print("Extracting page \(index) from: \(url.lastPathComponent)")
+        
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            print("File does not exist at path: \(url.path)")
+            return nil
+        }
+        
+        let fileExtension = url.pathExtension.lowercased()
+        
+        switch fileExtension {
+        case "cbz", "zip":
+            return extractSinglePageFromZip(at: index, url: url)
+        case "cbr":
+            return nil // Add CBR support later
+        default:
+            return nil
+        }
+    }
+    
+    // Get page count without loading images (NEW METHOD)
+    static func getPageCount(from url: URL) -> Int {
+        print("Getting page count from: \(url.lastPathComponent)")
+        
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            print("File does not exist at path: \(url.path)")
+            return 0
+        }
+        
+        let fileExtension = url.pathExtension.lowercased()
+        
+        switch fileExtension {
+        case "cbz", "zip":
+            return getPageCountFromZip(url: url)
+        case "cbr":
+            return 0 // Add CBR support later
+        default:
+            return 0
+        }
+    }
+    
+    // Extract all pages (keep for backward compatibility)
     static func extractPages(from url: URL) -> [UIImage] {
         print("Attempting to extract pages from: \(url.path)")
         
-        // Check if file exists
         guard FileManager.default.fileExists(atPath: url.path) else {
             print("File does not exist at path: \(url.path)")
             return []
@@ -25,9 +67,64 @@ class ArchiveProcessor {
         }
     }
     
+    // Extract cover image efficiently (just page 0)
     static func extractCoverImage(from url: URL) -> UIImage? {
-        let pages = extractPages(from: url)
-        return pages.first
+        return extractPage(at: 0, from: url)
+    }
+    
+    // PRIVATE HELPER METHODS
+    
+    private static func extractSinglePageFromZip(at index: Int, url: URL) -> UIImage? {
+        do {
+            let archive = try Archive(url: url, accessMode: .read)
+            
+            let imageEntries = archive.filter { entry in
+                let pathExtension = URL(fileURLWithPath: entry.path).pathExtension.lowercased()
+                return ["jpg", "jpeg", "png", "gif", "webp", "bmp"].contains(pathExtension)
+            }.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+            
+            guard index < imageEntries.count else {
+                print("Index \(index) out of range for \(imageEntries.count) pages")
+                return nil
+            }
+            
+            let entry = imageEntries[index]
+            var imageData = Data()
+            
+            _ = try archive.extract(entry) { data in
+                imageData.append(data)
+            }
+            
+            if let image = UIImage(data: imageData) {
+                print("✅ Successfully extracted page \(index): \(entry.path)")
+                return image
+            } else {
+                print("❌ Failed to create UIImage from data for page \(index)")
+                return nil
+            }
+            
+        } catch {
+            print("❌ Error extracting page \(index): \(error)")
+            return nil
+        }
+    }
+    
+    private static func getPageCountFromZip(url: URL) -> Int {
+        do {
+            let archive = try Archive(url: url, accessMode: .read)
+            
+            let imageCount = archive.filter { entry in
+                let pathExtension = URL(fileURLWithPath: entry.path).pathExtension.lowercased()
+                return ["jpg", "jpeg", "png", "gif", "webp", "bmp"].contains(pathExtension)
+            }.count
+            
+            print("Found \(imageCount) pages in archive")
+            return imageCount
+            
+        } catch {
+            print("Error getting page count from ZIP: \(error)")
+            return 0
+        }
     }
     
     private static func extractFromZip(url: URL) -> [UIImage] {
@@ -52,7 +149,6 @@ class ArchiveProcessor {
             // Extract each image
             for entry in imageEntries {
                 var imageData = Data()
-                
                 _ = try archive.extract(entry) { data in
                     imageData.append(data)
                 }
@@ -64,6 +160,7 @@ class ArchiveProcessor {
                     print("Failed to create UIImage from data for: \(entry.path)")
                 }
             }
+            
         } catch {
             print("Error extracting ZIP archive: \(error)")
         }

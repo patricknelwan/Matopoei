@@ -18,59 +18,49 @@ class ComicCell: UICollectionViewCell {
     }
     
     private func setupViews() {
-        // No rounded corners, no shadows - just clean cells
         contentView.backgroundColor = .clear
         
-        // Image view setup - clean comic cover
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.backgroundColor = .systemGray6
         
-        // Title label setup
         titleLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         titleLabel.textAlignment = .center
         titleLabel.numberOfLines = 2
         titleLabel.textColor = .label
         
-        // Page count label setup
         pageCountLabel.font = UIFont.systemFont(ofSize: 11, weight: .regular)
         pageCountLabel.textAlignment = .center
         pageCountLabel.textColor = .secondaryLabel
         
-        // Progress view setup
         progressView.progressTintColor = .systemBlue
         progressView.trackTintColor = .systemGray4
         
-        // Add subviews
         contentView.addSubview(imageView)
         contentView.addSubview(titleLabel)
         contentView.addSubview(pageCountLabel)
         contentView.addSubview(progressView)
         
-        // Clean layout - image takes most space, title below
         imageView.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         pageCountLabel.translatesAutoresizingMaskIntoConstraints = false
         progressView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // Comic cover takes up most of the cell
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            imageView.heightAnchor.constraint(equalTo: contentView.heightAnchor, multiplier: 0.75),
+            // Fixed height instead of aspect ratio to avoid constraint conflicts
+            imageView.heightAnchor.constraint(equalToConstant: 240),
             
-            // Title directly below cover
             titleLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
             
-            // Page count below title
             pageCountLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
-            pageCountLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
-            pageCountLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
+            pageCountLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+            pageCountLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
             
-            // Progress bar at bottom
             progressView.topAnchor.constraint(equalTo: pageCountLabel.bottomAnchor, constant: 4),
             progressView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             progressView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),

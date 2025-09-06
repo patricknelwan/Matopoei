@@ -98,20 +98,19 @@ class LibraryViewController: UIViewController {
     }
     
     private func createCollectionViewLayout() -> UICollectionViewLayout {
-        // Simple: 3 columns in portrait, 4 in landscape
         let isLandscape = view.bounds.width > view.bounds.height
         let columnsCount = isLandscape ? 4 : 3
         
         let itemSize = NSCollectionLayoutSize(
             widthDimension: .fractionalWidth(1.0 / CGFloat(columnsCount)),
-            heightDimension: .absolute(280) // Reduced height for cleaner look
+            heightDimension: .absolute(320) // MUST be .absolute, NOT .estimated
         )
         let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        item.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        // NO contentInsets on item!
         
         let groupSize = NSCollectionLayoutSize(
             widthDimension: .fractionalWidth(1.0),
-            heightDimension: .absolute(280)
+            heightDimension: .absolute(320)
         )
         
         let group = NSCollectionLayoutGroup.horizontal(
@@ -119,9 +118,11 @@ class LibraryViewController: UIViewController {
             repeatingSubitem: item,
             count: columnsCount
         )
+        group.interItemSpacing = .fixed(8)
         
         let section = NSCollectionLayoutSection(group: group)
         section.contentInsets = NSDirectionalEdgeInsets(top: 20, leading: 16, bottom: 20, trailing: 16)
+        section.interGroupSpacing = 8
         
         return UICollectionViewCompositionalLayout(section: section)
     }
