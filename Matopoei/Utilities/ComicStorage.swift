@@ -101,6 +101,62 @@ class ComicStorage {
             }
         }
     }
+
+    func createPhysicalFolder(named folderName: String) -> URL? {
+        let fileManager = FileManager.default
+        let folderURL = documentsDirectory.appendingPathComponent(folderName)
+        
+        if !fileManager.fileExists(atPath: folderURL.path) {
+            do {
+                try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true, attributes: nil)
+                print("✅ Created physical folder: \(folderURL.path)")
+                return folderURL
+            } catch {
+                print("❌ Failed to create folder: \(error)")
+                return nil
+            }
+        } else {
+            print("📁 Folder already exists: \(folderURL.path)")
+            return folderURL
+        }
+    }
+
+    func moveComicToFolder(_ comic: ComicBook, folderName: String) -> ComicBook? {
+        let fileManager = FileManager.default
+        let folderURL = documentsDirectory.appendingPathComponent(folderName)
+        let destinationURL = folderURL.appendingPathComponent(comic.fileURL.lastPathComponent)
+        
+        do {
+            // Remove existing file if it exists
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try fileManager.removeItem(at: destinationURL)
+            }
+            
+            // Move the comic file
+            try fileManager.moveItem(at: comic.fileURL, to: destinationURL)
+            print("✅ Moved comic to folder: \(destinationURL.path)")
+            
+            // Create updated comic with new file URL
+            var updatedComic = comic
+            updatedComic.fileURL = destinationURL
+            return updatedComic
+            
+        } catch {
+            print("❌ Failed to move comic: \(error)")
+            return nil
+        }
+    }
+
+    func createFolderAndMoveComic(_ comic: ComicBook, folderName: String) -> ComicBook? {
+        // First create the folder
+        guard createPhysicalFolder(named: folderName) != nil else {
+            return nil
+        }
+        
+        // Then move the comic
+        return moveComicToFolder(comic, folderName: folderName)
+    }
+
 }
 
 // UPDATED: ComicBookMetadata with custom decoder for migration

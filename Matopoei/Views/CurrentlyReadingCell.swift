@@ -65,21 +65,22 @@ class CurrentlyReadingCell: UITableViewCell {
         contentView.addSubview(progressView)
         contentView.addSubview(continueButton)
         
-        // Fix: Remove conflicting height constraint and use proper margins
+        // Fixed constraints - remove conflicting height constraint
         NSLayoutConstraint.activate([
-            // Thumbnail - use aspect ratio instead of fixed height
+            // Thumbnail - use flexible constraints instead of fixed height
             thumbnailImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             thumbnailImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            thumbnailImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            thumbnailImageView.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -12),
             thumbnailImageView.widthAnchor.constraint(equalToConstant: 60),
-            thumbnailImageView.heightAnchor.constraint(lessThanOrEqualToConstant: 90), // Maximum height
+            // Remove fixed height - let it be flexible
+            thumbnailImageView.heightAnchor.constraint(lessThanOrEqualToConstant: 90),
             
             // Title
             titleLabel.leadingAnchor.constraint(equalTo: thumbnailImageView.trailingAnchor, constant: 16),
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
             titleLabel.trailingAnchor.constraint(equalTo: continueButton.leadingAnchor, constant: -8),
             
-            // Subtitle (reading progress text)
+            // Subtitle
             subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             subtitleLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),

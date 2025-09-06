@@ -6,16 +6,16 @@ class LibraryViewController: UIViewController {
     private var comics: [ComicBook] = []
     private let comicImporter = ComicImporter()
     private let comicStorage = ComicStorage()
-    private var currentFolder: ComicFolder? // Add this property
-    
-    // Add this initializer to support folder filtering
-    init(folder: ComicFolder? = nil) {
-        self.currentFolder = folder
+    private var currentFolderURL: URL? // Updated to track folder URL instead of ComicFolder
+
+    // Updated initializer to accept folder URL
+    init(folderURL: URL? = nil) {
+        self.currentFolderURL = folderURL
         super.init(nibName: nil, bundle: nil)
     }
-    
+
     required init?(coder: NSCoder) {
-        self.currentFolder = nil
+        self.currentFolderURL = nil
         super.init(coder: coder)
     }
 
@@ -25,7 +25,6 @@ class LibraryViewController: UIViewController {
         setupUI()
         loadComics()
         
-        // Update layout when device rotates
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(orientationDidChange),
@@ -47,7 +46,7 @@ class LibraryViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        loadComics() // Reload to get fresh data
+        loadComics()
         collectionView.reloadData()
     }
 
@@ -64,18 +63,18 @@ class LibraryViewController: UIViewController {
 
     private func setupUI() {
         // Update title based on folder or main library
-        if let folder = currentFolder {
-            title = folder.name
+        if let folderURL = currentFolderURL {
+            title = folderURL.lastPathComponent
         } else {
-            title = "Library"
+            title = "All Comics"
         }
-        
+
         navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemBackground
         comicImporter.delegate = self
         
         // Add import button (only show in main library, not in folders)
-        if currentFolder == nil {
+        if currentFolderURL == nil {
             navigationItem.rightBarButtonItem = UIBarButtonItem(
                 image: UIImage(systemName: "plus"),
                 style: .plain,
@@ -92,7 +91,7 @@ class LibraryViewController: UIViewController {
             menu: settingsMenu
         )
     }
-    
+
     private func createSettingsMenu() -> UIMenu {
         var actions: [UIAction] = []
         
@@ -104,11 +103,11 @@ class LibraryViewController: UIViewController {
         actions.append(UIAction(title: "Sort by Date Added", image: UIImage(systemName: "calendar")) { _ in
             self.sortComics(by: .dateAdded)
         })
-        
-        // If in a folder, add "Move All to Library" option
-        if currentFolder != nil {
-            actions.append(UIAction(title: "Move All to Library", image: UIImage(systemName: "arrow.up.bin")) { _ in
-                self.moveAllComicsToLibrary()
+
+        // If in a folder, add "Move All to Main Library" option
+        if currentFolderURL != nil {
+            actions.append(UIAction(title: "Move All to Main Library", image: UIImage(systemName: "arrow.up.bin")) { _ in
+                self.moveAllComicsToMainLibrary()
             })
         } else {
             // If in main library, add "Clear Library" option
@@ -116,7 +115,7 @@ class LibraryViewController: UIViewController {
                 self.confirmClearLibrary()
             })
         }
-        
+
         return UIMenu(title: "", children: actions)
     }
 
@@ -158,11 +157,121 @@ class LibraryViewController: UIViewController {
         return UICollectionViewCompositionalLayout(section: section)
     }
 
-    private func showEmptyState() {
-        let message = currentFolder != nil ?
-            "No comics in this folder\nMove comics here from the main library" :
-            "No comics in your library\nTap + to import comics"
+    // Updated loadComics to work with file system
+    private func loadComics() {
+        // Remove any existing empty state
+        view.subviews.filter { $0 is UILabel }.forEach { $0.removeFromSuperview() }
+        
+        let fileManager = FileManager.default
+        
+        do {
+            if let folderURL = currentFolderURL {
+                // Load comics from specific folder
+                title = folderURL.lastPathComponent
+                
+                let contents = try fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
+                let comicURLs = contents.filter { url in
+                    let pathExtension = url.pathExtension.lowercased()
+                    return ["cbz", "cbr", "zip"].contains(pathExtension)
+                }
+                
+                // Convert URLs to ComicBook objects
+                comics = comicURLs.compactMap { comicURL in
+                    // Find existing comic or create new one
+                    let allComics = comicStorage.loadComics()
+                    if let existingComic = allComics.first(where: { $0.fileURL == comicURL }) {
+                        return existingComic
+                    } else {
+                        // Create comic on-the-fly
+                        let pageCount = ArchiveProcessor.getPageCount(from: comicURL)
+                        let coverImage = ArchiveProcessor.extractCoverImage(from: comicURL)
+                        let coverImageData = coverImage?.jpegData(compressionQuality: 0.8)
+                        
+                        return ComicBook(
+                            title: comicURL.deletingPathExtension().lastPathComponent,
+                            fileURL: comicURL,
+                            coverImageData: coverImageData,
+                            totalPages: pageCount
+                        )
+                    }
+                }
+            } else {
+                // Load all comics from entire Documents directory
+                title = "All Comics"
+                
+                guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                    comics = []
+                    return
+                }
+                
+                // Recursively find all comic files
+                comics = findAllComics(in: documentsURL)
+            }
             
+            collectionView.reloadData()
+            
+            if comics.isEmpty {
+                showEmptyState()
+            }
+        } catch {
+            print("Error loading folder contents: \(error)")
+            comics = []
+            collectionView.reloadData()
+            showEmptyState()
+        }
+    }
+    
+    private func findAllComics(in directory: URL) -> [ComicBook] {
+        let fileManager = FileManager.default
+        var allComics: [ComicBook] = []
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            
+            for url in contents {
+                var isDirectory: ObjCBool = false
+                fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
+                
+                if isDirectory.boolValue {
+                    // Recursively search subdirectories
+                    allComics.append(contentsOf: findAllComics(in: url))
+                } else {
+                    // Check if it's a comic file
+                    let pathExtension = url.pathExtension.lowercased()
+                    if ["cbz", "cbr", "zip"].contains(pathExtension) {
+                        // Find existing comic or create new one
+                        let savedComics = comicStorage.loadComics()
+                        if let existingComic = savedComics.first(where: { $0.fileURL == url }) {
+                            allComics.append(existingComic)
+                        } else {
+                            // Create comic on-the-fly
+                            let pageCount = ArchiveProcessor.getPageCount(from: url)
+                            let coverImage = ArchiveProcessor.extractCoverImage(from: url)
+                            let coverImageData = coverImage?.jpegData(compressionQuality: 0.8)
+                            
+                            let comic = ComicBook(
+                                title: url.deletingPathExtension().lastPathComponent,
+                                fileURL: url,
+                                coverImageData: coverImageData,
+                                totalPages: pageCount
+                            )
+                            allComics.append(comic)
+                        }
+                    }
+                }
+            }
+        } catch {
+            print("Error searching directory \(directory.path): \(error)")
+        }
+        
+        return allComics
+    }
+
+    private func showEmptyState() {
+        let message = currentFolderURL != nil ?
+            "No comics in this folder\nMove comics here or import new ones" :
+            "No comics in your library\nTap + to import comics"
+
         let emptyLabel = UILabel()
         emptyLabel.text = message
         emptyLabel.textAlignment = .center
@@ -189,37 +298,60 @@ class LibraryViewController: UIViewController {
         case .dateAdded:
             comics.sort { $0.dateAdded > $1.dateAdded }
         }
-        
+
         collectionView.reloadData()
     }
-    
-    private func moveAllComicsToLibrary() {
-        guard let folder = currentFolder else { return }
+
+    private func moveAllComicsToMainLibrary() {
+        guard let folderURL = currentFolderURL else { return }
         
         let alert = UIAlertController(
             title: "Move All Comics",
-            message: "Move all comics from '\(folder.name)' back to the main library?",
+            message: "Move all comics from '\(folderURL.lastPathComponent)' to the main library?",
             preferredStyle: .alert
         )
-        
+
         alert.addAction(UIAlertAction(title: "Move", style: .default) { _ in
-            // Remove comics from folder
-            var updatedFolder = folder
-            updatedFolder.comicIds.removeAll()
-            
-            // Update folders in storage
-            var folders = self.comicStorage.loadFolders()
-            if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
-                folders[folderIndex] = updatedFolder
-                self.comicStorage.saveFolders(folders)
-            }
-            
-            // Refresh view
-            self.loadComics()
+            self.performMoveAllComicsToMainLibrary()
         })
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
+    }
+    
+    private func performMoveAllComicsToMainLibrary() {
+        guard let folderURL = currentFolderURL else { return }
+        
+        let fileManager = FileManager.default
+        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
+            
+            for fileURL in contents {
+                let destinationURL = documentsURL.appendingPathComponent(fileURL.lastPathComponent)
+                
+                // Handle name conflicts
+                var finalDestinationURL = destinationURL
+                var counter = 1
+                while fileManager.fileExists(atPath: finalDestinationURL.path) {
+                    let nameWithoutExtension = destinationURL.deletingPathExtension().lastPathComponent
+                    let fileExtension = destinationURL.pathExtension
+                    let newName = "\(nameWithoutExtension)_\(counter).\(fileExtension)"
+                    finalDestinationURL = documentsURL.appendingPathComponent(newName)
+                    counter += 1
+                }
+                
+                try fileManager.moveItem(at: fileURL, to: finalDestinationURL)
+            }
+            
+            // Refresh view
+            loadComics()
+            
+        } catch {
+            print("Error moving comics: \(error)")
+            showError("Failed to move comics: \(error.localizedDescription)")
+        }
     }
 
     private func confirmClearLibrary() {
@@ -230,6 +362,7 @@ class LibraryViewController: UIViewController {
         )
 
         alert.addAction(UIAlertAction(title: "Clear", style: .destructive) { _ in
+            // This would need to delete all comic files - be careful!
             self.comics.removeAll()
             self.comicStorage.saveComics([])
             self.collectionView.reloadData()
@@ -238,29 +371,6 @@ class LibraryViewController: UIViewController {
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
-    }
-
-    private func loadComics() {
-        // Remove any existing empty state
-        view.subviews.filter { $0 is UILabel }.forEach { $0.removeFromSuperview() }
-        
-        let allComics = comicStorage.loadComics()
-        
-        if let folder = currentFolder {
-            // Filter comics for this specific folder
-            comics = allComics.filter { comic in
-                folder.comicIds.contains(comic.id)
-            }
-        } else {
-            // Show all comics (main library)
-            comics = allComics
-        }
-        
-        collectionView.reloadData()
-        
-        if comics.isEmpty {
-            showEmptyState()
-        }
     }
 
     private func saveComics() {
@@ -278,7 +388,7 @@ class LibraryViewController: UIViewController {
             allComics[comicIndex] = updatedComic
             comicStorage.saveComics(allComics)
         }
-        
+
         let readerVC = ComicReaderViewController()
         readerVC.comic = updatedComic
         readerVC.delegate = self
@@ -286,8 +396,6 @@ class LibraryViewController: UIViewController {
         present(readerVC, animated: true)
     }
 
-    // Rest of your existing methods remain the same...
-    
     private func showComicInfo(_ comic: ComicBook) {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useKB]
@@ -307,25 +415,42 @@ class LibraryViewController: UIViewController {
 
     private func removeComic(at index: Int) {
         let comic = comics[index]
-        comics.remove(at: index)
         
-        // Remove from storage
-        var allComics = comicStorage.loadComics()
-        allComics.removeAll { $0.id == comic.id }
-        comicStorage.saveComics(allComics)
+        let alert = UIAlertController(title: "Remove Comic", message: "Are you sure you want to delete '\(comic.title)'?", preferredStyle: .alert)
         
-        // Remove from any folders
-        var folders = comicStorage.loadFolders()
-        for i in folders.indices {
-            folders[i].comicIds.removeAll { $0 == comic.id }
-        }
-        comicStorage.saveFolders(folders)
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
+            // Delete the actual file
+            do {
+                try FileManager.default.removeItem(at: comic.fileURL)
+                
+                // Remove from comics array
+                self.comics.remove(at: index)
+                
+                // Remove from storage
+                var allComics = self.comicStorage.loadComics()
+                allComics.removeAll { $0.id == comic.id }
+                self.comicStorage.saveComics(allComics)
+                
+                // Update UI
+                self.collectionView.deleteItems(at: [IndexPath(item: index, section: 0)])
+                
+                if self.comics.isEmpty {
+                    self.showEmptyState()
+                }
+            } catch {
+                print("Error deleting comic: \(error)")
+                self.showError("Failed to delete comic: \(error.localizedDescription)")
+            }
+        })
         
-        collectionView.deleteItems(at: [IndexPath(item: index, section: 0)])
-        
-        if comics.isEmpty {
-            showEmptyState()
-        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
+    
+    private func showError(_ message: String) {
+        let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 }
 
@@ -365,10 +490,10 @@ extension LibraryViewController: UICollectionViewDelegate {
                 self.showComicInfo(comic)
             })
             
-            // Add folder management options
-            if self.currentFolder == nil {
-                actions.append(UIAction(title: "Add to Folder", image: UIImage(systemName: "folder.badge.plus")) { _ in
-                    self.showAddToFolderMenu(for: comic)
+            // Add folder management options only in main library
+            if self.currentFolderURL == nil {
+                actions.append(UIAction(title: "Move to Folder", image: UIImage(systemName: "folder.badge.plus")) { _ in
+                    self.showMoveToFolderMenu(for: comic, at: indexPath.item)
                 })
             }
             
@@ -380,47 +505,80 @@ extension LibraryViewController: UICollectionViewDelegate {
         }
     }
     
-    private func showAddToFolderMenu(for comic: ComicBook) {
-        let folders = comicStorage.loadFolders()
+    private func showMoveToFolderMenu(for comic: ComicBook, at index: Int) {
+        let fileManager = FileManager.default
+        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
         
-        if folders.isEmpty {
-            let alert = UIAlertController(title: "No Folders", message: "Create a folder first from the sidebar", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: documentsURL, includingPropertiesForKeys: nil)
+            let folders = contents.filter { url in
+                var isDirectory: ObjCBool = false
+                fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
+                return isDirectory.boolValue
+            }.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            
+            if folders.isEmpty {
+                let alert = UIAlertController(title: "No Folders", message: "Create a folder first from the sidebar", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                present(alert, animated: true)
+                return
+            }
+            
+            let alert = UIAlertController(title: "Move to Folder", message: "Choose a folder for '\(comic.title)'", preferredStyle: .actionSheet)
+            
+            for folderURL in folders {
+                alert.addAction(UIAlertAction(title: folderURL.lastPathComponent, style: .default) { _ in
+                    self.moveComicToFolder(comic, at: index, folderURL: folderURL)
+                })
+            }
+            
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            
+            if let popover = alert.popoverPresentationController {
+                popover.sourceView = collectionView
+                popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            }
+            
             present(alert, animated: true)
-            return
+        } catch {
+            print("Error loading folders: \(error)")
         }
-        
-        let alert = UIAlertController(title: "Add to Folder", message: "Choose a folder for '\(comic.title)'", preferredStyle: .actionSheet)
-        
-        for folder in folders {
-            alert.addAction(UIAlertAction(title: folder.name, style: .default) { _ in
-                self.addComicToFolder(comic, folder: folder)
-            })
-        }
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = collectionView
-            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
-        }
-        
-        present(alert, animated: true)
     }
     
-    private func addComicToFolder(_ comic: ComicBook, folder: ComicFolder) {
-        var updatedFolder = folder
-        updatedFolder.addComic(comic.id)
+    private func moveComicToFolder(_ comic: ComicBook, at index: Int, folderURL: URL) {
+        let fileManager = FileManager.default
+        let destinationURL = folderURL.appendingPathComponent(comic.fileURL.lastPathComponent)
         
-        var folders = comicStorage.loadFolders()
-        if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
-            folders[folderIndex] = updatedFolder
-            comicStorage.saveFolders(folders)
+        do {
+            // Handle name conflicts
+            var finalDestinationURL = destinationURL
+            var counter = 1
+            while fileManager.fileExists(atPath: finalDestinationURL.path) {
+                let nameWithoutExtension = destinationURL.deletingPathExtension().lastPathComponent
+                let fileExtension = destinationURL.pathExtension
+                let newName = "\(nameWithoutExtension)_\(counter).\(fileExtension)"
+                finalDestinationURL = folderURL.appendingPathComponent(newName)
+                counter += 1
+            }
+            
+            try fileManager.moveItem(at: comic.fileURL, to: finalDestinationURL)
+            
+            // Remove from current view
+            comics.remove(at: index)
+            collectionView.deleteItems(at: [IndexPath(item: index, section: 0)])
+            
+            if comics.isEmpty {
+                showEmptyState()
+            }
             
             // Show success message
-            let alert = UIAlertController(title: "Added", message: "'\(comic.title)' added to '\(folder.name)'", preferredStyle: .alert)
+            let alert = UIAlertController(title: "Moved", message: "'\(comic.title)' moved to '\(folderURL.lastPathComponent)'", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default))
             present(alert, animated: true)
+            
+        } catch {
+            print("Error moving comic: \(error)")
+            showError("Failed to move comic: \(error.localizedDescription)")
         }
     }
 }
@@ -428,16 +586,8 @@ extension LibraryViewController: UICollectionViewDelegate {
 // MARK: - ComicImporterDelegate
 extension LibraryViewController: ComicImporterDelegate {
     func didImportComics(_ newComics: [ComicBook]) {
-        let startIndex = comics.count
-        comics.append(contentsOf: newComics)
-        saveComics()
-        
-        // Remove empty state if present
-        view.subviews.filter { $0 is UILabel }.forEach { $0.removeFromSuperview() }
-        
-        // Insert new items
-        let indexPaths = (startIndex..<comics.count).map { IndexPath(item: $0, section: 0) }
-        collectionView.insertItems(at: indexPaths)
+        // Refresh to show newly imported comics
+        loadComics()
     }
     
     func didFailToImport(error: Error) {

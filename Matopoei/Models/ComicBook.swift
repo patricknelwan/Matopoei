@@ -4,7 +4,7 @@ import Foundation
 struct ComicBook: Identifiable, Codable {
     let id: UUID
     let title: String
-    let fileURL: URL
+    var fileURL: URL
     let coverImageData: Data?
     var currentPageIndex: Int
     let totalPages: Int

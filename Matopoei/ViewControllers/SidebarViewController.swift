@@ -7,7 +7,7 @@ enum SidebarSection: Int, CaseIterable {
     var title: String {
         switch self {
         case .main: return "Main"
-        case .folders: return "My Folders"
+        case .folders: return "Folders"
         }
     }
 }
@@ -20,7 +20,7 @@ enum MainMenuItem: Int, CaseIterable {
     var title: String {
         switch self {
         case .readingNow: return "Reading Now"
-        case .library: return "Library"
+        case .library: return "All Comics"
         case .importComics: return "Import Comics"
         }
     }
@@ -38,17 +38,17 @@ class SidebarViewController: UIViewController {
     
     private var tableView: UITableView!
     private let comicStorage = ComicStorage()
-    private var folders: [ComicFolder] = []
+    private var folders: [FileBrowserItem] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        loadFolders()
+        loadDirectories()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        loadFolders()
+        loadDirectories()
         tableView.reloadData()
     }
     
@@ -79,8 +79,25 @@ class SidebarViewController: UIViewController {
         )
     }
     
-    private func loadFolders() {
-        folders = comicStorage.loadFolders()
+    private func loadDirectories() {
+        let fileManager = FileManager.default
+        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: documentsURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+            
+            // Filter only directories
+            folders = contents.compactMap { url in
+                let item = FileBrowserItem(url: url)
+                return item.isDirectory ? item : nil
+            }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            
+        } catch {
+            print("Error loading directories: \(error)")
+            folders = []
+        }
     }
     
     @objc private func createNewFolder() {
@@ -95,19 +112,40 @@ class SidebarViewController: UIViewController {
             guard let name = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !name.isEmpty else { return }
             
-            let newFolder = ComicFolder(name: name)
-            self.folders.append(newFolder)
-            self.comicStorage.saveFolders(self.folders)
-            self.loadFolders()
-            self.tableView.reloadData()
+            self.createPhysicalFolder(named: name)
         })
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
     }
     
-    private func showLibrary(folder: ComicFolder? = nil) {
-        let libraryVC = LibraryViewController(folder: folder)
+    private func createPhysicalFolder(named folderName: String) {
+        let fileManager = FileManager.default
+        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+        
+        let folderURL = documentsURL.appendingPathComponent(folderName)
+        
+        do {
+            try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true, attributes: nil)
+            print("✅ Created folder: \(folderURL.path)")
+            loadDirectories()
+            tableView.reloadData()
+        } catch {
+            print("❌ Failed to create folder: \(error)")
+            showError("Failed to create folder: \(error.localizedDescription)")
+        }
+    }
+    
+    private func showError(_ message: String) {
+        let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showLibrary(folderURL: URL? = nil) {
+        let libraryVC = LibraryViewController(folderURL: folderURL)
         presentDetailViewController(libraryVC)
     }
     
@@ -121,7 +159,6 @@ class SidebarViewController: UIViewController {
         presentDetailViewController(importVC)
     }
     
-    // Fix: Renamed method to avoid conflict with UIViewController's method
     private func presentDetailViewController(_ viewController: UIViewController) {
         let navController = UINavigationController(rootViewController: viewController)
         splitViewController?.setViewController(navController, for: .secondary)
@@ -175,9 +212,12 @@ extension SidebarViewController: UITableViewDataSource, UITableViewDelegate {
             var configuration = cell.defaultContentConfiguration()
             configuration.text = folder.name
             configuration.image = UIImage(systemName: "folder.fill")
-            configuration.secondaryText = "\(folder.comicIds.count) comics"
-            cell.contentConfiguration = configuration
             
+            // Count comics in folder
+            let comicCount = countComicsInFolder(folder.url)
+            configuration.secondaryText = "\(comicCount) comics"
+            
+            cell.contentConfiguration = configuration
             return cell
         }
     }
@@ -194,14 +234,14 @@ extension SidebarViewController: UITableViewDataSource, UITableViewDelegate {
             case .readingNow:
                 showReadingNow()
             case .library:
-                showLibrary()
+                showLibrary() // All comics
             case .importComics:
                 showImport()
             }
             
         case .folders:
             let folder = folders[indexPath.row]
-            showLibrary(folder: folder)
+            showLibrary(folderURL: folder.url) // Comics in specific folder
         }
     }
     
@@ -214,17 +254,68 @@ extension SidebarViewController: UITableViewDataSource, UITableViewDelegate {
         
         let alert = UIAlertController(
             title: "Delete Folder",
-            message: "Are you sure you want to delete '\(folder.name)'? Comics will be moved to Library.",
+            message: "Are you sure you want to delete '\(folder.name)'? All comics will be moved to the main library.",
             preferredStyle: .alert
         )
         
         alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
-            self.folders.remove(at: indexPath.row)
-            self.comicStorage.saveFolders(self.folders)
-            self.tableView.deleteRows(at: [indexPath], with: .fade)
+            self.deleteFolder(folder)
         })
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
+    }
+    
+    private func deleteFolder(_ folder: FileBrowserItem) {
+        let fileManager = FileManager.default
+        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+        
+        do {
+            // Move all files from folder to Documents root
+            let folderContents = try fileManager.contentsOfDirectory(at: folder.url, includingPropertiesForKeys: nil)
+            
+            for fileURL in folderContents {
+                let destinationURL = documentsURL.appendingPathComponent(fileURL.lastPathComponent)
+                
+                // Handle name conflicts
+                var finalDestinationURL = destinationURL
+                var counter = 1
+                while fileManager.fileExists(atPath: finalDestinationURL.path) {
+                    let nameWithoutExtension = destinationURL.deletingPathExtension().lastPathComponent
+                    let fileExtension = destinationURL.pathExtension
+                    let newName = "\(nameWithoutExtension)_\(counter).\(fileExtension)"
+                    finalDestinationURL = documentsURL.appendingPathComponent(newName)
+                    counter += 1
+                }
+                
+                try fileManager.moveItem(at: fileURL, to: finalDestinationURL)
+            }
+            
+            // Delete the empty folder
+            try fileManager.removeItem(at: folder.url)
+            
+            loadDirectories()
+            tableView.reloadData()
+            
+        } catch {
+            showError("Failed to delete folder: \(error.localizedDescription)")
+        }
+    }
+    
+    private func countComicsInFolder(_ folderURL: URL) -> Int {
+        let fileManager = FileManager.default
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
+            
+            return contents.filter { url in
+                let pathExtension = url.pathExtension.lowercased()
+                return ["cbz", "cbr", "zip"].contains(pathExtension)
+            }.count
+        } catch {
+            return 0
+        }
     }
 }
