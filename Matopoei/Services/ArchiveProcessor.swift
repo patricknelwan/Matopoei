@@ -67,9 +67,59 @@ class ArchiveProcessor {
         }
     }
     
-    // Extract cover image efficiently (just page 0)
+    // Update extractCoverImage method to be more efficient
     static func extractCoverImage(from url: URL) -> UIImage? {
-        return extractPage(at: 0, from: url)
+        print("Extracting cover from: \(url.lastPathComponent)")
+        
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            print("File does not exist at path: \(url.path)")
+            return nil
+        }
+        
+        let fileExtension = url.pathExtension.lowercased()
+        
+        switch fileExtension {
+        case "cbz", "zip":
+            return extractCoverFromZip(url: url)
+        case "cbr":
+            return nil // CBR support coming soon
+        default:
+            return nil
+        }
+    }
+
+    private static func extractCoverFromZip(url: URL) -> UIImage? {
+        do {
+            let archive = try Archive(url: url, accessMode: .read)
+            
+            // Get first image file (usually the cover)
+            let firstImageEntry = archive.first { entry in
+                let pathExtension = URL(fileURLWithPath: entry.path).pathExtension.lowercased()
+                return ["jpg", "jpeg", "png", "gif", "webp", "bmp"].contains(pathExtension)
+            }
+            
+            guard let coverEntry = firstImageEntry else {
+                print("No image files found in archive")
+                return nil
+            }
+            
+            var imageData = Data()
+            _ = try archive.extract(coverEntry) { data in
+                imageData.append(data)
+            }
+            
+            if let image = UIImage(data: imageData) {
+                print("✅ Successfully extracted cover: \(coverEntry.path)")
+                return image
+            } else {
+                print("❌ Failed to create UIImage from cover data")
+                return nil
+            }
+            
+        } catch {
+            print("❌ Error extracting cover: \(error)")
+            return nil
+        }
     }
     
     // PRIVATE HELPER METHODS

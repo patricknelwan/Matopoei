@@ -1,5 +1,9 @@
 import UIKit
 
+protocol ComicReaderDelegate: AnyObject {
+    func didUpdateReadingProgress(for comic: ComicBook, currentPage: Int)
+}
+
 extension UIImage {
     func fused(with rightImage: UIImage?) -> UIImage? {
         guard let rightImage = rightImage else { return self }

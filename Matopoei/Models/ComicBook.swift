@@ -10,6 +10,7 @@ struct ComicBook: Identifiable, Codable {
     let totalPages: Int
     let dateAdded: Date
     let fileSize: Int64
+    var lastReadDate: Date // Add this property
     
     init(title: String, fileURL: URL, coverImageData: Data? = nil, totalPages: Int = 0) {
         self.id = UUID()
@@ -19,6 +20,7 @@ struct ComicBook: Identifiable, Codable {
         self.currentPageIndex = 0
         self.totalPages = totalPages
         self.dateAdded = Date()
+        self.lastReadDate = Date() // Initialize with current date
         
         // Get file size
         if let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path) {
@@ -29,7 +31,7 @@ struct ComicBook: Identifiable, Codable {
     }
     
     // Additional initializer for loading from storage
-    init(id: UUID, title: String, fileURL: URL, coverImageData: Data?, currentPageIndex: Int, totalPages: Int, dateAdded: Date, fileSize: Int64) {
+    init(id: UUID, title: String, fileURL: URL, coverImageData: Data?, currentPageIndex: Int, totalPages: Int, dateAdded: Date, fileSize: Int64, lastReadDate: Date) {
         self.id = id
         self.title = title
         self.fileURL = fileURL
@@ -38,6 +40,7 @@ struct ComicBook: Identifiable, Codable {
         self.totalPages = totalPages
         self.dateAdded = dateAdded
         self.fileSize = fileSize
+        self.lastReadDate = lastReadDate
     }
     
     var coverImage: UIImage? {
@@ -49,20 +52,4 @@ struct ComicBook: Identifiable, Codable {
         guard totalPages > 0 else { return 0 }
         return Float(currentPageIndex) / Float(totalPages)
     }
-}
-
-enum ComicFormat: String, CaseIterable {
-    case cbr = "cbr"
-    case cbz = "cbz"
-    
-    var displayName: String {
-        return rawValue.uppercased()
-    }
-}
-
-enum ComicError: Error {
-    case unsupportedFormat
-    case corruptedFile
-    case noPages
-    case accessDenied
 }
