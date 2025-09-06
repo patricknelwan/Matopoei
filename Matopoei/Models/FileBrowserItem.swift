@@ -17,7 +17,6 @@ struct FileBrowserItem: Identifiable, Hashable {
         fileManager.fileExists(atPath: url.path, isDirectory: &isDir)
         self.isDirectory = isDir.boolValue
         
-        // Get file attributes
         do {
             let attributes = try fileManager.attributesOfItem(atPath: url.path)
             self.dateModified = attributes[.modificationDate] as? Date ?? Date()

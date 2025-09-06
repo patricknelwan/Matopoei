@@ -53,7 +53,6 @@ extension ComicImporter: UIDocumentPickerDelegate {
                     try FileManager.default.copyItem(at: readingURL, to: permanentURL)
                     print("✅ Successfully copied: \(fileName)")
                     
-                    // Use the new efficient methods:
                     let pageCount = ArchiveProcessor.getPageCount(from: permanentURL)
                     let coverImage = ArchiveProcessor.extractCoverImage(from: permanentURL)
                     print("📚 Found \(pageCount) pages")

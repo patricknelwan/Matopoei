@@ -6,16 +6,14 @@ struct LibrarySettings {
     
     static let `default` = LibrarySettings(portraitColumns: 2, landscapeColumns: 4)
     
-    // Valid column ranges
     static let minColumns = 1
     static let maxColumns = 6
     
     var currentColumns: Int {
-        // Fixed: Use active window scene instead of deprecated statusBarOrientation
         guard let windowScene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive }) else {
-            return portraitColumns // Default to portrait if can't determine
+            return portraitColumns
         }
         
         let isLandscape = windowScene.interfaceOrientation.isLandscape

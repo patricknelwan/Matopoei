@@ -9,7 +9,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         window = UIWindow(windowScene: windowScene)
         
-        // Check for iOS 14+ for modern sidebar
         if #available(iOS 14.0, *) {
             setupModernSidebar()
         } else {

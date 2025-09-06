@@ -58,7 +58,6 @@ class ComicStorage {
         }
     }
     
-    // Add folder methods directly here
     func saveFolders(_ folders: [ComicFolder]) {
         do {
             let data = try JSONEncoder().encode(folders)
@@ -148,18 +147,15 @@ class ComicStorage {
     }
 
     func createFolderAndMoveComic(_ comic: ComicBook, folderName: String) -> ComicBook? {
-        // First create the folder
         guard createPhysicalFolder(named: folderName) != nil else {
             return nil
         }
         
-        // Then move the comic
         return moveComicToFolder(comic, folderName: folderName)
     }
 
 }
 
-// UPDATED: ComicBookMetadata with custom decoder for migration
 private struct ComicBookMetadata: Codable {
     let id: UUID
     let title: String
@@ -184,7 +180,6 @@ private struct ComicBookMetadata: Codable {
         totalPages = try container.decode(Int.self, forKey: .totalPages)
         dateAdded = try container.decode(Date.self, forKey: .dateAdded)
         fileSize = try container.decode(Int64.self, forKey: .fileSize)
-        // Use dateAdded as fallback if lastReadDate is missing (for old data)
         lastReadDate = try container.decodeIfPresent(Date.self, forKey: .lastReadDate) ?? dateAdded
     }
     

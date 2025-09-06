@@ -10,7 +10,7 @@ struct ComicBook: Identifiable, Codable {
     let totalPages: Int
     let dateAdded: Date
     let fileSize: Int64
-    var lastReadDate: Date // Add this property
+    var lastReadDate: Date
     
     init(title: String, fileURL: URL, coverImageData: Data? = nil, totalPages: Int = 0) {
         self.id = UUID()
@@ -20,9 +20,8 @@ struct ComicBook: Identifiable, Codable {
         self.currentPageIndex = 0
         self.totalPages = totalPages
         self.dateAdded = Date()
-        self.lastReadDate = Date() // Initialize with current date
+        self.lastReadDate = Date()
         
-        // Get file size
         if let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path) {
             self.fileSize = attributes[.size] as? Int64 ?? 0
         } else {
@@ -30,7 +29,6 @@ struct ComicBook: Identifiable, Codable {
         }
     }
     
-    // Additional initializer for loading from storage
     init(id: UUID, title: String, fileURL: URL, coverImageData: Data?, currentPageIndex: Int, totalPages: Int, dateAdded: Date, fileSize: Int64, lastReadDate: Date) {
         self.id = id
         self.title = title

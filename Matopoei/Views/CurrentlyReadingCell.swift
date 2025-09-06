@@ -65,7 +65,7 @@ class CurrentlyReadingCell: UITableViewCell {
         contentView.addSubview(progressView)
         contentView.addSubview(continueButton)
         
-        // Fixed constraints - remove conflicting height constraint
+        // Fixed constraints
         NSLayoutConstraint.activate([
             // Thumbnail - use flexible constraints instead of fixed height
             thumbnailImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),

@@ -3,7 +3,6 @@ import UIKit
 
 class ArchiveProcessor {
     
-    // Extract single page by index (most efficient)
     static func extractPage(at index: Int, from url: URL) -> UIImage? {
         print("Extracting page \(index) from: \(url.lastPathComponent)")
         
@@ -24,7 +23,6 @@ class ArchiveProcessor {
         }
     }
     
-    // Get page count without loading images (NEW METHOD)
     static func getPageCount(from url: URL) -> Int {
         print("Getting page count from: \(url.lastPathComponent)")
         
@@ -45,7 +43,6 @@ class ArchiveProcessor {
         }
     }
     
-    // Extract all pages (keep for backward compatibility)
     static func extractPages(from url: URL) -> [UIImage] {
         print("Attempting to extract pages from: \(url.path)")
         
@@ -67,7 +64,6 @@ class ArchiveProcessor {
         }
     }
     
-    // Update extractCoverImage method to be more efficient
     static func extractCoverImage(from url: URL) -> UIImage? {
         print("Extracting cover from: \(url.lastPathComponent)")
         
@@ -121,8 +117,6 @@ class ArchiveProcessor {
             return nil
         }
     }
-    
-    // PRIVATE HELPER METHODS
     
     private static func extractSinglePageFromZip(at index: Int, url: URL) -> UIImage? {
         do {
