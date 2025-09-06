@@ -157,7 +157,7 @@ class LibraryViewController: UIViewController {
         return UICollectionViewCompositionalLayout(section: section)
     }
 
-    // Updated loadComics to work with file system
+    // Updated loadComics to work purely with file system
     private func loadComics() {
         // Remove any existing empty state
         view.subviews.filter { $0 is UILabel }.forEach { $0.removeFromSuperview() }
@@ -168,51 +168,92 @@ class LibraryViewController: UIViewController {
             if let folderURL = currentFolderURL {
                 // Load comics from specific folder
                 title = folderURL.lastPathComponent
-                
                 let contents = try fileManager.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
                 let comicURLs = contents.filter { url in
                     let pathExtension = url.pathExtension.lowercased()
                     return ["cbz", "cbr", "zip"].contains(pathExtension)
                 }
                 
-                // Convert URLs to ComicBook objects
+                // Load saved metadata for comics that exist in the file system
+                let savedComics = comicStorage.loadComics()
+                
                 comics = comicURLs.compactMap { comicURL in
-                    // Find existing comic or create new one
-                    let allComics = comicStorage.loadComics()
-                    if let existingComic = allComics.first(where: { $0.fileURL == comicURL }) {
+                    // First try to find existing comic metadata
+                    if let existingComic = savedComics.first(where: { $0.fileURL == comicURL }) {
                         return existingComic
                     } else {
-                        // Create comic on-the-fly
+                        // Create comic on-the-fly for files without metadata
                         let pageCount = ArchiveProcessor.getPageCount(from: comicURL)
+                        guard pageCount > 0 else { return nil }
+                        
                         let coverImage = ArchiveProcessor.extractCoverImage(from: comicURL)
                         let coverImageData = coverImage?.jpegData(compressionQuality: 0.8)
                         
-                        return ComicBook(
+                        let comic = ComicBook(
                             title: comicURL.deletingPathExtension().lastPathComponent,
                             fileURL: comicURL,
                             coverImageData: coverImageData,
                             totalPages: pageCount
                         )
+                        
+                        // Save this new comic to storage
+                        var updatedSavedComics = comicStorage.loadComics()
+                        updatedSavedComics.append(comic)
+                        comicStorage.saveComics(updatedSavedComics)
+                        
+                        return comic
                     }
                 }
+                
             } else {
                 // Load all comics from entire Documents directory
                 title = "All Comics"
-                
                 guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
                     comics = []
                     return
                 }
                 
-                // Recursively find all comic files
-                comics = findAllComics(in: documentsURL)
+                // Find all comic files in file system
+                let foundComicURLs = findAllComicURLs(in: documentsURL)
+                let savedComics = comicStorage.loadComics()
+                
+                comics = foundComicURLs.compactMap { comicURL in
+                    // First try to find existing comic metadata
+                    if let existingComic = savedComics.first(where: { $0.fileURL == comicURL }) {
+                        return existingComic
+                    } else {
+                        // Create comic on-the-fly for files without metadata
+                        let pageCount = ArchiveProcessor.getPageCount(from: comicURL)
+                        guard pageCount > 0 else { return nil }
+                        
+                        let coverImage = ArchiveProcessor.extractCoverImage(from: comicURL)
+                        let coverImageData = coverImage?.jpegData(compressionQuality: 0.8)
+                        
+                        let comic = ComicBook(
+                            title: comicURL.deletingPathExtension().lastPathComponent,
+                            fileURL: comicURL,
+                            coverImageData: coverImageData,
+                            totalPages: pageCount
+                        )
+                        
+                        // Save this new comic to storage
+                        var updatedSavedComics = comicStorage.loadComics()
+                        updatedSavedComics.append(comic)
+                        comicStorage.saveComics(updatedSavedComics)
+                        
+                        return comic
+                    }
+                }
+                
+                // Clean up storage - remove metadata for files that no longer exist
+                cleanupOrphanedComics(existingURLs: foundComicURLs)
             }
             
             collectionView.reloadData()
-            
             if comics.isEmpty {
                 showEmptyState()
             }
+            
         } catch {
             print("Error loading folder contents: \(error)")
             comics = []
@@ -220,10 +261,11 @@ class LibraryViewController: UIViewController {
             showEmptyState()
         }
     }
-    
-    private func findAllComics(in directory: URL) -> [ComicBook] {
+
+    // Helper method to find all comic file URLs
+    private func findAllComicURLs(in directory: URL) -> [URL] {
         let fileManager = FileManager.default
-        var allComics: [ComicBook] = []
+        var allComicURLs: [URL] = []
         
         do {
             let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
@@ -234,29 +276,12 @@ class LibraryViewController: UIViewController {
                 
                 if isDirectory.boolValue {
                     // Recursively search subdirectories
-                    allComics.append(contentsOf: findAllComics(in: url))
+                    allComicURLs.append(contentsOf: findAllComicURLs(in: url))
                 } else {
                     // Check if it's a comic file
                     let pathExtension = url.pathExtension.lowercased()
                     if ["cbz", "cbr", "zip"].contains(pathExtension) {
-                        // Find existing comic or create new one
-                        let savedComics = comicStorage.loadComics()
-                        if let existingComic = savedComics.first(where: { $0.fileURL == url }) {
-                            allComics.append(existingComic)
-                        } else {
-                            // Create comic on-the-fly
-                            let pageCount = ArchiveProcessor.getPageCount(from: url)
-                            let coverImage = ArchiveProcessor.extractCoverImage(from: url)
-                            let coverImageData = coverImage?.jpegData(compressionQuality: 0.8)
-                            
-                            let comic = ComicBook(
-                                title: url.deletingPathExtension().lastPathComponent,
-                                fileURL: url,
-                                coverImageData: coverImageData,
-                                totalPages: pageCount
-                            )
-                            allComics.append(comic)
-                        }
+                        allComicURLs.append(url)
                     }
                 }
             }
@@ -264,7 +289,21 @@ class LibraryViewController: UIViewController {
             print("Error searching directory \(directory.path): \(error)")
         }
         
-        return allComics
+        return allComicURLs
+    }
+
+    // Clean up orphaned comic metadata for files that no longer exist
+    private func cleanupOrphanedComics(existingURLs: [URL]) {
+        let savedComics = comicStorage.loadComics()
+        let cleanedComics = savedComics.filter { comic in
+            existingURLs.contains(comic.fileURL)
+        }
+        
+        // Only save if we actually removed some comics
+        if cleanedComics.count != savedComics.count {
+            comicStorage.saveComics(cleanedComics)
+            print("Cleaned up \(savedComics.count - cleanedComics.count) orphaned comic entries")
+        }
     }
 
     private func showEmptyState() {
@@ -360,17 +399,40 @@ class LibraryViewController: UIViewController {
             message: "This will remove all comics from your library. This action cannot be undone.",
             preferredStyle: .alert
         )
-
-        alert.addAction(UIAlertAction(title: "Clear", style: .destructive) { _ in
-            // This would need to delete all comic files - be careful!
-            self.comics.removeAll()
-            self.comicStorage.saveComics([])
-            self.collectionView.reloadData()
-            self.showEmptyState()
-        })
         
+        alert.addAction(UIAlertAction(title: "Clear", style: .destructive) { _ in
+            self.performClearLibrary()
+        })
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
+    }
+
+    private func performClearLibrary() {
+        let fileManager = FileManager.default
+        guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        
+        do {
+            // Delete all comic files recursively
+            let allComicURLs = findAllComicURLs(in: documentsURL)
+            for comicURL in allComicURLs {
+                try fileManager.removeItem(at: comicURL)
+            }
+            
+            // Clear storage
+            comicStorage.saveComics([])
+            comicStorage.clearAll() // This also clears cover images
+            
+            // Update UI
+            comics.removeAll()
+            collectionView.reloadData()
+            showEmptyState()
+            
+            print("✅ Library cleared: deleted \(allComicURLs.count) comic files")
+            
+        } catch {
+            print("❌ Error clearing library: \(error)")
+            showError("Failed to clear library: \(error.localizedDescription)")
+        }
     }
 
     private func saveComics() {
