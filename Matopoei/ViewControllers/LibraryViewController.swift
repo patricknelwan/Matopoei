@@ -63,7 +63,7 @@ class LibraryViewController: UIViewController {
     }
     
     private func setupUI() {
-        title = "Matopoe"
+        title = "Library"
         navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemBackground
         
