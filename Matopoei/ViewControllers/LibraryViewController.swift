@@ -12,11 +12,42 @@ class LibraryViewController: UIViewController {
         setupCollectionView()
         setupUI()
         loadComics()
+        
+        // Update layout when device rotates
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(orientationDidChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func orientationDidChange() {
+        DispatchQueue.main.async {
+            let newLayout = self.createCollectionViewLayout()
+            self.collectionView.setCollectionViewLayout(newLayout, animated: true)
+        }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         collectionView.reloadData()
+    }
+    
+    private func cleanupBrokenComics() {
+        let comics = comicStorage.loadComics()
+        let validComics = comics.filter { comic in
+            return FileManager.default.fileExists(atPath: comic.fileURL.path)
+        }
+        
+        if validComics.count != comics.count {
+            print("Removed \(comics.count - validComics.count) comics with broken file paths")
+            comicStorage.saveComics(validComics)
+        }
     }
     
     private func setupCollectionView() {
@@ -46,36 +77,59 @@ class LibraryViewController: UIViewController {
             action: #selector(importButtonTapped)
         )
         
-        // Add library management button
+        // Add settings button with menu
+        let settingsMenu = UIMenu(title: "", children: [
+            UIAction(title: "Sort by Title", image: UIImage(systemName: "textformat.abc")) { _ in
+                self.sortComics(by: .title)
+            },
+            UIAction(title: "Sort by Date Added", image: UIImage(systemName: "calendar")) { _ in
+                self.sortComics(by: .dateAdded)
+            },
+            UIAction(title: "Clear Library", image: UIImage(systemName: "trash"), attributes: .destructive) { _ in
+                self.confirmClearLibrary()
+            }
+        ])
+        
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             image: UIImage(systemName: "gear"),
-            style: .plain,
-            target: self,
-            action: #selector(settingsButtonTapped)
+            primaryAction: nil,
+            menu: settingsMenu
         )
     }
     
     private func createCollectionViewLayout() -> UICollectionViewLayout {
+        let isLandscape = view.bounds.width > view.bounds.height
+        let columnsCount = isLandscape ? 4 : 3
+        
         let itemSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .fractionalHeight(1.0)
+            widthDimension: .fractionalWidth(1.0 / CGFloat(columnsCount)),
+            heightDimension: .absolute(320) // MUST be .absolute, NOT .estimated
         )
         let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        item.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        // NO contentInsets on item!
         
-        // Adaptive columns based on iPad screen size
-        let columnsCount: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 4 : 2
         let groupSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0 / columnsCount),
+            widthDimension: .fractionalWidth(1.0),
             heightDimension: .absolute(320)
         )
-        let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
+        
+        let group = NSCollectionLayoutGroup.horizontal(
+            layoutSize: groupSize,
+            repeatingSubitem: item,
+            count: columnsCount
+        )
+        group.interItemSpacing = .fixed(8)
         
         let section = NSCollectionLayoutSection(group: group)
-        section.orthogonalScrollingBehavior = .none
         section.contentInsets = NSDirectionalEdgeInsets(top: 20, leading: 16, bottom: 20, trailing: 16)
+        section.interGroupSpacing = 8
         
         return UICollectionViewCompositionalLayout(section: section)
+    }
+    
+    private func updateCollectionViewLayout() {
+        let newLayout = createCollectionViewLayout()
+        collectionView.setCollectionViewLayout(newLayout, animated: true)
     }
     
     private func showEmptyState() {
@@ -96,31 +150,6 @@ class LibraryViewController: UIViewController {
     
     @objc private func importButtonTapped() {
         comicImporter.importComics(presentingViewController: self)
-    }
-    
-    @objc private func settingsButtonTapped() {
-        let alert = UIAlertController(title: "Library Settings", message: nil, preferredStyle: .actionSheet)
-        
-        alert.addAction(UIAlertAction(title: "Sort by Title", style: .default) { _ in
-            self.sortComics(by: .title)
-        })
-        
-        alert.addAction(UIAlertAction(title: "Sort by Date Added", style: .default) { _ in
-            self.sortComics(by: .dateAdded)
-        })
-        
-        alert.addAction(UIAlertAction(title: "Clear Library", style: .destructive) { _ in
-            self.confirmClearLibrary()
-        })
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
-        // For iPad
-        if let popover = alert.popoverPresentationController {
-            popover.barButtonItem = navigationItem.leftBarButtonItem
-        }
-        
-        present(alert, animated: true)
     }
     
     private func sortComics(by sortType: ComicSortType) {
@@ -280,6 +309,16 @@ extension LibraryViewController: ComicReaderDelegate {
             if let cell = collectionView.cellForItem(at: indexPath) as? ComicCell {
                 cell.configure(with: comics[index])
             }
+        }
+    }
+}
+
+// MARK: - LibrarySettingsDelegate
+extension LibraryViewController: LibrarySettingsDelegate {
+    func didUpdateLibrarySettings(_ settings: LibrarySettings) {
+        // Force update the layout with new settings
+        DispatchQueue.main.async {
+            self.updateCollectionViewLayout()
         }
     }
 }

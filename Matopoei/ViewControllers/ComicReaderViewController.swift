@@ -11,7 +11,8 @@ class ComicReaderViewController: UIViewController {
     var comic: ComicBook!
     weak var delegate: ComicReaderDelegate?
     
-    private var pages: [UIImage] = []
+    // Don't store all pages - load on demand
+    private var totalPages: Int = 0
     private var currentPageIndex: Int = 0
     private var hideControlsTimer: Timer?
     private var isControlsVisible = true
@@ -19,14 +20,14 @@ class ComicReaderViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        loadPages()
+        loadComicInfo() // Only load page count, not all pages
         setupGestures()
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         currentPageIndex = comic.currentPageIndex
-        displayCurrentPage()
+        loadCurrentPage() // Load only current page
         resetHideControlsTimer()
     }
     
@@ -45,11 +46,12 @@ class ComicReaderViewController: UIViewController {
         scrollView = UIScrollView(frame: view.bounds)
         scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         scrollView.delegate = self
-        scrollView.minimumZoomScale = 0.5
+        scrollView.minimumZoomScale = 1.0
         scrollView.maximumZoomScale = 4.0
         scrollView.showsVerticalScrollIndicator = false
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.backgroundColor = .black
+        scrollView.contentInsetAdjustmentBehavior = .never
         view.addSubview(scrollView)
         
         // Setup image view
@@ -99,12 +101,10 @@ class ComicReaderViewController: UIViewController {
         )
         
         let flexibleSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
-        
         toolbar.items = [closeButton, flexibleSpace, previousButton, flexibleSpace, nextButton, flexibleSpace, settingsButton]
         toolbar.tintColor = .white
         toolbar.barTintColor = .black
         toolbar.isTranslucent = true
-        
         view.addSubview(toolbar)
     }
     
@@ -115,7 +115,6 @@ class ComicReaderViewController: UIViewController {
         pageLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         pageLabel.textAlignment = .center
         pageLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-        
         view.addSubview(pageLabel)
     }
     
@@ -124,7 +123,6 @@ class ComicReaderViewController: UIViewController {
         progressView.autoresizingMask = [.flexibleWidth, .flexibleTopMargin]
         progressView.progressTintColor = .white
         progressView.trackTintColor = UIColor.white.withAlphaComponent(0.3)
-        
         view.addSubview(progressView)
     }
     
@@ -151,54 +149,69 @@ class ComicReaderViewController: UIViewController {
         view.addGestureRecognizer(swipeRight)
     }
     
-    private func loadPages() {
-        guard comic.fileURL.startAccessingSecurityScopedResource() else { return }
-        defer { comic.fileURL.stopAccessingSecurityScopedResource() }
+    // FIXED: Load comic info only, not all pages
+    private func loadComicInfo() {
+        totalPages = comic.totalPages
+        updatePageLabel()
+        updateProgress()
+    }
+    
+    // FIXED: Load only the current page
+    private func loadCurrentPage() {
+        guard currentPageIndex >= 0 && currentPageIndex < totalPages else { return }
+        
+        print("Loading page \(currentPageIndex + 1) of \(totalPages)")
         
         DispatchQueue.global(qos: .userInitiated).async {
-            let extractedPages = ArchiveProcessor.extractPages(from: self.comic.fileURL)
+            // Extract only the current page
+            let pageImage = ArchiveProcessor.extractPage(at: self.currentPageIndex, from: self.comic.fileURL)
             
             DispatchQueue.main.async {
-                self.pages = extractedPages
-                self.displayCurrentPage()
+                if let image = pageImage {
+                    self.imageView.image = image
+                    print("✅ Successfully loaded page \(self.currentPageIndex + 1)")
+                } else {
+                    print("❌ Failed to load page \(self.currentPageIndex + 1)")
+                }
+                
+                self.updatePageLabel()
+                self.updateProgress()
+                self.resetZoom()
+                
+                // Update reading progress
+                self.delegate?.didUpdateReadingProgress(for: self.comic, currentPage: self.currentPageIndex)
             }
         }
     }
     
-    private func displayCurrentPage() {
-        guard currentPageIndex < pages.count, currentPageIndex >= 0 else { return }
-        
-        imageView.image = pages[currentPageIndex]
-        updatePageLabel()
-        updateProgress()
-        
-        // Reset zoom
+    private func resetZoom() {
         scrollView.zoomScale = scrollView.minimumZoomScale
-        
-        // Update reading progress
-        delegate?.didUpdateReadingProgress(for: comic, currentPage: currentPageIndex)
+        DispatchQueue.main.async {
+            self.imageView.frame = self.scrollView.bounds
+            self.scrollView.contentSize = self.imageView.frame.size
+        }
     }
     
     private func updatePageLabel() {
-        pageLabel.text = "Page \(currentPageIndex + 1) of \(pages.count)"
+        pageLabel.text = "Page \(currentPageIndex + 1) of \(totalPages)"
     }
     
     private func updateProgress() {
-        let progress = pages.count > 0 ? Float(currentPageIndex + 1) / Float(pages.count) : 0
+        let progress = totalPages > 0 ? Float(currentPageIndex + 1) / Float(totalPages) : 0
         progressView.setProgress(progress, animated: true)
     }
     
     @objc private func previousPage() {
         guard currentPageIndex > 0 else { return }
         currentPageIndex -= 1
-        displayCurrentPage()
+        loadCurrentPage()
         resetHideControlsTimer()
     }
     
     @objc private func nextPage() {
-        guard currentPageIndex < pages.count - 1 else { return }
+        guard currentPageIndex < totalPages - 1 else { return }
         currentPageIndex += 1
-        displayCurrentPage()
+        loadCurrentPage()
         resetHideControlsTimer()
     }
     
@@ -231,6 +244,25 @@ class ComicReaderViewController: UIViewController {
         }
         
         resetHideControlsTimer()
+    }
+    
+    private func centerScrollViewContents() {
+        let boundsSize = scrollView.bounds.size
+        var contentsFrame = imageView.frame
+        
+        if contentsFrame.size.width < boundsSize.width {
+            contentsFrame.origin.x = (boundsSize.width - contentsFrame.size.width) / 2.0
+        } else {
+            contentsFrame.origin.x = 0.0
+        }
+        
+        if contentsFrame.size.height < boundsSize.height {
+            contentsFrame.origin.y = (boundsSize.height - contentsFrame.size.height) / 2.0
+        } else {
+            contentsFrame.origin.y = 0.0
+        }
+        
+        imageView.frame = contentsFrame
     }
     
     private func zoomRectForScale(_ scale: CGFloat, center: CGPoint) -> CGRect {
@@ -266,7 +298,6 @@ class ComicReaderViewController: UIViewController {
     
     private func resetHideControlsTimer() {
         hideControlsTimer?.invalidate()
-        
         guard isControlsVisible else { return }
         
         hideControlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
@@ -300,7 +331,7 @@ class ComicReaderViewController: UIViewController {
     }
     
     private func showPagePicker() {
-        let alert = UIAlertController(title: "Go to Page", message: "Enter page number (1-\(pages.count))", preferredStyle: .alert)
+        let alert = UIAlertController(title: "Go to Page", message: "Enter page number (1-\(totalPages))", preferredStyle: .alert)
         
         alert.addTextField { textField in
             textField.keyboardType = .numberPad
@@ -312,16 +343,15 @@ class ComicReaderViewController: UIViewController {
             guard let text = alert.textFields?.first?.text,
                   let pageNumber = Int(text),
                   pageNumber > 0,
-                  pageNumber <= self.pages.count else {
+                  pageNumber <= self.totalPages else {
                 return
             }
             
             self.currentPageIndex = pageNumber - 1
-            self.displayCurrentPage()
+            self.loadCurrentPage()
         })
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
         present(alert, animated: true)
     }
     
@@ -337,6 +367,11 @@ extension ComicReaderViewController: UIScrollViewDelegate {
     }
     
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        centerScrollViewContents()
         resetHideControlsTimer()
+    }
+    
+    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        centerScrollViewContents()
     }
 }

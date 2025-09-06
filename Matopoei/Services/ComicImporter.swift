@@ -11,7 +11,6 @@ class ComicImporter: NSObject {
     
     func importComics(presentingViewController: UIViewController) {
         let supportedTypes: [UTType] = [
-            UTType(filenameExtension: "cbr")!,
             UTType(filenameExtension: "cbz")!,
             UTType.zip
         ]
@@ -28,62 +27,72 @@ class ComicImporter: NSObject {
 // MARK: - UIDocumentPickerDelegate
 extension ComicImporter: UIDocumentPickerDelegate {
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        var importedComics: [ComicBook] = []
+        print("Document picker selected \(urls.count) files")
         
-        DispatchQueue.global(qos: .userInitiated).async {
-            let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        var importedComics: [ComicBook] = []
+        let fileCoordinator = NSFileCoordinator()
+        var error: NSError?
+        
+        for url in urls {
+            print("Processing: \(url.lastPathComponent)")
             
-            for url in urls {
-                guard url.startAccessingSecurityScopedResource() else { continue }
-                defer { url.stopAccessingSecurityScopedResource() }
+            // Use file coordinator for proper iOS file access
+            fileCoordinator.coordinate(readingItemAt: url, options: .withoutChanges, error: &error) { (readingURL) in
                 
-                // Create permanent file path in app's documents directory
-                let fileName = url.lastPathComponent
+                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let fileName = readingURL.lastPathComponent
                 let permanentURL = documentsDirectory.appendingPathComponent(fileName)
                 
                 do {
-                    // Remove existing file if present
+                    // Remove existing file
                     if FileManager.default.fileExists(atPath: permanentURL.path) {
                         try FileManager.default.removeItem(at: permanentURL)
                     }
                     
-                    // Copy file to permanent location
-                    try FileManager.default.copyItem(at: url, to: permanentURL)
-                    print("Successfully copied file to: \(permanentURL.path)")
+                    // Copy using file coordinator
+                    try FileManager.default.copyItem(at: readingURL, to: permanentURL)
+                    print("✅ Successfully copied: \(fileName)")
                     
-                    // Extract pages from permanent location
-                    let pages = ArchiveProcessor.extractPages(from: permanentURL)
-                    print("Extracted \(pages.count) pages from \(fileName)")
-                    
-                    guard !pages.isEmpty else {
-                        print("No pages found in \(fileName)")
-                        continue
+                    // Use the new efficient methods:
+                    let pageCount = ArchiveProcessor.getPageCount(from: permanentURL)
+                    let coverImage = ArchiveProcessor.extractCoverImage(from: permanentURL)
+                    print("📚 Found \(pageCount) pages")
+
+                    if pageCount > 0 {
+                        let coverImageData = coverImage?.jpegData(compressionQuality: 0.8)
+                        let title = permanentURL.deletingPathExtension().lastPathComponent
+                        
+                        let comic = ComicBook(
+                            title: title,
+                            fileURL: permanentURL,
+                            coverImageData: coverImageData,
+                            totalPages: pageCount
+                        )
+                        
+                        importedComics.append(comic)
                     }
-                    
-                    let coverImageData = pages.first?.jpegData(compressionQuality: 0.8)
-                    let title = permanentURL.deletingPathExtension().lastPathComponent
-                    
-                    let comic = ComicBook(
-                        title: title,
-                        fileURL: permanentURL, // Use permanent URL, not temporary one
-                        coverImageData: coverImageData,
-                        totalPages: pages.count
-                    )
-                    
-                    importedComics.append(comic)
-                    
                 } catch {
-                    print("Failed to copy file \(fileName): \(error)")
+                    print("❌ Error processing \(fileName): \(error)")
                 }
             }
             
-            DispatchQueue.main.async {
-                if !importedComics.isEmpty {
-                    self.delegate?.didImportComics(importedComics)
-                } else {
-                    let error = NSError(domain: "ComicImportError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to import any comics. Check file format and try again."])
-                    self.delegate?.didFailToImport(error: error)
-                }
+            if let error = error {
+                print("❌ File coordinator error: \(error)")
+            }
+        }
+        
+        // Update UI on main thread
+        DispatchQueue.main.async {
+            if !importedComics.isEmpty {
+                print("🎉 Successfully imported \(importedComics.count) comics")
+                self.delegate?.didImportComics(importedComics)
+            } else {
+                let error = NSError(
+                    domain: "ComicImportError",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to import comics. Please check file permissions and try again."]
+                )
+                self.delegate?.didFailToImport(error: error)
             }
         }
     }

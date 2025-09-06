@@ -18,66 +18,54 @@ class ComicCell: UICollectionViewCell {
     }
     
     private func setupViews() {
-        contentView.layer.cornerRadius = 12
-        contentView.layer.shadowColor = UIColor.black.cgColor
-        contentView.layer.shadowOpacity = 0.15
-        contentView.layer.shadowOffset = CGSize(width: 0, height: 2)
-        contentView.layer.shadowRadius = 8
-        contentView.backgroundColor = .systemBackground
+        contentView.backgroundColor = .clear
         
-        // Image view setup
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 8
-        imageView.backgroundColor = .systemGray5
+        imageView.backgroundColor = .systemGray6
         
-        // Title label setup
-        titleLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        titleLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         titleLabel.textAlignment = .center
         titleLabel.numberOfLines = 2
         titleLabel.textColor = .label
         
-        // Page count label setup
-        pageCountLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+        pageCountLabel.font = UIFont.systemFont(ofSize: 11, weight: .regular)
         pageCountLabel.textAlignment = .center
         pageCountLabel.textColor = .secondaryLabel
         
-        // Progress view setup
         progressView.progressTintColor = .systemBlue
         progressView.trackTintColor = .systemGray4
-        progressView.layer.cornerRadius = 2
         
-        // Add subviews
         contentView.addSubview(imageView)
         contentView.addSubview(titleLabel)
         contentView.addSubview(pageCountLabel)
         contentView.addSubview(progressView)
         
-        // Auto Layout
         imageView.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         pageCountLabel.translatesAutoresizingMaskIntoConstraints = false
         progressView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
-            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
-            imageView.heightAnchor.constraint(equalTo: contentView.heightAnchor, multiplier: 0.65),
+            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            // Fixed height instead of aspect ratio to avoid constraint conflicts
+            imageView.heightAnchor.constraint(equalToConstant: 240),
             
-            titleLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 8),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            titleLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
             
-            pageCountLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
-            pageCountLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
-            pageCountLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            pageCountLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            pageCountLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+            pageCountLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
             
-            progressView.topAnchor.constraint(equalTo: pageCountLabel.bottomAnchor, constant: 8),
-            progressView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
-            progressView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
-            progressView.heightAnchor.constraint(equalToConstant: 4),
-            progressView.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -8)
+            progressView.topAnchor.constraint(equalTo: pageCountLabel.bottomAnchor, constant: 4),
+            progressView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            progressView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            progressView.heightAnchor.constraint(equalToConstant: 2),
+            progressView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
         ])
     }
     
