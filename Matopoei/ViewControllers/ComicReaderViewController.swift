@@ -1,5 +1,9 @@
 import UIKit
 
+protocol ComicReaderDelegate: AnyObject {
+    func didUpdateReadingProgress(for comic: ComicBook, currentPage: Int)
+}
+
 extension UIImage {
     func fused(with rightImage: UIImage?) -> UIImage? {
         guard let rightImage = rightImage else { return self }
@@ -27,7 +31,7 @@ extension UIImage {
 class ComicReaderViewController: UIViewController {
     
     private var scrollView: UIScrollView!
-    private var mainImageView: UIImageView! // Single image view for both modes
+    private var mainImageView: UIImageView!
     private var pageLabel: UILabel!
     private var toolbar: UIToolbar!
     private var progressView: UIProgressView!
@@ -42,7 +46,7 @@ class ComicReaderViewController: UIViewController {
     private var isControlsVisible = true
     
     // Reader settings
-    private var forceDoublePage: Bool? = nil // nil = auto (follow orientation)
+    private var forceDoublePage: Bool? = nil
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -188,11 +192,10 @@ class ComicReaderViewController: UIViewController {
     private func updateLayoutForSize(_ size: CGSize) {
         let isLandscape = size.width > size.height
         
-        // Determine if we should show double pages
         if let forced = forceDoublePage {
             showingDoublePage = forced
         } else {
-            showingDoublePage = isLandscape // Default: single in portrait, double in landscape
+            showingDoublePage = isLandscape
         }
         
         configureImageView(for: size)

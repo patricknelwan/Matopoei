@@ -4,12 +4,13 @@ import Foundation
 struct ComicBook: Identifiable, Codable {
     let id: UUID
     let title: String
-    let fileURL: URL
+    var fileURL: URL
     let coverImageData: Data?
     var currentPageIndex: Int
     let totalPages: Int
     let dateAdded: Date
     let fileSize: Int64
+    var lastReadDate: Date
     
     init(title: String, fileURL: URL, coverImageData: Data? = nil, totalPages: Int = 0) {
         self.id = UUID()
@@ -19,8 +20,8 @@ struct ComicBook: Identifiable, Codable {
         self.currentPageIndex = 0
         self.totalPages = totalPages
         self.dateAdded = Date()
+        self.lastReadDate = Date()
         
-        // Get file size
         if let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path) {
             self.fileSize = attributes[.size] as? Int64 ?? 0
         } else {
@@ -28,8 +29,7 @@ struct ComicBook: Identifiable, Codable {
         }
     }
     
-    // Additional initializer for loading from storage
-    init(id: UUID, title: String, fileURL: URL, coverImageData: Data?, currentPageIndex: Int, totalPages: Int, dateAdded: Date, fileSize: Int64) {
+    init(id: UUID, title: String, fileURL: URL, coverImageData: Data?, currentPageIndex: Int, totalPages: Int, dateAdded: Date, fileSize: Int64, lastReadDate: Date) {
         self.id = id
         self.title = title
         self.fileURL = fileURL
@@ -38,6 +38,7 @@ struct ComicBook: Identifiable, Codable {
         self.totalPages = totalPages
         self.dateAdded = dateAdded
         self.fileSize = fileSize
+        self.lastReadDate = lastReadDate
     }
     
     var coverImage: UIImage? {
@@ -49,20 +50,4 @@ struct ComicBook: Identifiable, Codable {
         guard totalPages > 0 else { return 0 }
         return Float(currentPageIndex) / Float(totalPages)
     }
-}
-
-enum ComicFormat: String, CaseIterable {
-    case cbr = "cbr"
-    case cbz = "cbz"
-    
-    var displayName: String {
-        return rawValue.uppercased()
-    }
-}
-
-enum ComicError: Error {
-    case unsupportedFormat
-    case corruptedFile
-    case noPages
-    case accessDenied
 }
