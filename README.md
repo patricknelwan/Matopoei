@@ -9,7 +9,7 @@ A comic book reader for iPad and iPhone.
 <img src="images/Icon Dark.png" width="128" height="128" alt="Matopoei Dark App Icon">
 <img src="images/Icon Light.png" width="128" height="128" alt="Matopoei Light App Icon">
 
-## Screenshots
+## Screenshots - Taken on iPad
 
 ### Library View
 <img src="images/Library.png" width="600" alt="Library View">
