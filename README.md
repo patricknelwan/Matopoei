@@ -1,88 +1,55 @@
 # Matopoei
 
-A beautiful comic book reader for iPhone and iPad, offering an immersive reading experience with smart layout switching.
+A comic book reader for iPad and iPhone.
+
+**⚠️ This project is currently under development.**
+
+## App Icon
+
+<img src="./Assets.xcassets/AppIcon.appiconset/Icon-1024.png" width="128" height="128" alt="Matopoei App Icon">
+
+## Screenshots
+
+### Library View
+<img src="./Screenshots/library_view.png" width="300" alt="Library View">
+
+### Reading Interface  
+<img src="./Screenshots/reading_view.png" width="300" alt="Reading Interface">
+
+### Folder Organization
+<img src="./Screenshots/folder_view.png" width="300" alt="Folder Organization">
 
 ## Features
 
-### 📚 Smart Reading Modes
-- **iPhone**: Optimized single page view for comfortable mobile reading
-- **iPad Portrait**: Single page view for detailed panel reading
-- **iPad Landscape**: Double page spread view, just like opening a real comic book
-- **Automatic Layout**: Seamlessly adapts to your device and orientation
-
-### 🎨 Immersive Experience
-- **Unified Zoom**: Smooth zooming across entire double-page spreads (iPad)
-- **Tap Navigation**: Tap left/right edges to turn pages, center to toggle controls
-- **Auto-Hide Controls**: Distraction-free reading with auto-hiding interface
-- **Full-Screen Reading**: Immersive edge-to-edge comic display
-
-### 📖 Reading Features
-- **Reading Progress**: Automatically saves where you left off
-- **Page Counter**: Track your progress through each comic
-- **Zoom & Pan**: Pinch to zoom and examine comic details
-- **Go to Page**: Jump to any specific page instantly
-
-### 📁 File Management
-- **CBZ Support**: Full support for CBZ (Comic Book ZIP) files
-- **Easy Import**: Import comics directly from Files app or other sources
-- **Automatic Organization**: Comics are automatically organized in your library
+- Read CBZ and CBR comic archives
+- Organize comics in folders
+- Single and double page reading modes
+- Reading progress tracking
+- Zoom and pan support
+- File import from document picker
+- Toggle visibility of system folders
 
 ## Supported Formats
 
-- ✅ **CBZ** (Comic Book ZIP)
-- 🔜 **CBR** (Comic Book RAR) - Coming Soon
+- CBZ (Comic Book ZIP)
+- CBR support coming soon
 
 ## Requirements
 
-- iPhone running iOS 13.0 or later
-- iPad running iOS 13.0 or later
-- Xcode 12.0+ (for development)
+- iOS 15.6+
+- iPadOS 15.6+
+- Xcode 12.0+
 
 ## Installation
 
-1. Clone the repository: `git clone https://github.com/patricknelwan/matopoei.git`
-   
+1. Clone this repository `git clone https://github.com/patricknelwan/Matopoei.git`
 2. Open `Matopoei.xcodeproj` in Xcode
-
-3. Build and run the project on your iPhone or iPad
+3. Build and run on your iOS device or simulator
 
 ## Usage
 
-1. **Import Comics**: Tap the "+" button to import CBZ files
-2. **Browse Library**: Your imported comics appear in a clean grid layout
-3. **Start Reading**: Tap any comic to open the full-screen reader
-4. **Navigate Pages**: 
-   - Tap left/right edges to turn pages
-   - Tap center to show/hide controls
-   - Pinch to zoom and pan around pages
-5. **Reading Progress**: Your progress is automatically saved
-
-## Device-Specific Features
-
-### iPhone
-- Single page optimized layout for mobile reading
-- Vertical scrolling support for long panels
-- Portrait orientation focus
-
-### iPad
-- Single page in portrait mode for detailed reading
-- Double page spread in landscape mode for authentic comic book experience
-- Enhanced zoom and pan capabilities for large screen
-
-## Architecture
-
-The app follows a clean MVVM architecture with these key components:
-
-- **Models**: `ComicBook`, `ComicStorage` for data management
-- **Views**: Custom table cells and UI components
-- **Controllers**: File browser, comic reader, and navigation logic
-- **Utilities**: Archive processing and file management
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Acknowledgments
-
-- Designed for both iPhone and iPad reading experiences
-- Optimized for the best comic reading experience on iOS
+1. Import comics using the + button
+2. Tap on a comic to start reading
+3. Use tap zones to navigate pages
+4. Long press for context menu options
+5. Create folders to organize your library
