@@ -6,18 +6,19 @@ A comic book reader for iPad and iPhone.
 
 ## App Icon
 
-<img src="./Assets.xcassets/AppIcon.appiconset/Icon-1024.png" width="128" height="128" alt="Matopoei App Icon">
+<img src="images/Icon Dark.png" width="128" height="128" alt="Matopoei Dark App Icon">
+<img src="images/Icon Light.png" width="128" height="128" alt="Matopoei Light App Icon">
 
 ## Screenshots
 
 ### Library View
-<img src="./Screenshots/library_view.png" width="300" alt="Library View">
+<img src="images/Library.png" width="600" alt="Library View">
 
 ### Reading Interface  
-<img src="./Screenshots/reading_view.png" width="300" alt="Reading Interface">
+<img src="images/Reader.png" width="600" alt="Reading Interface">
 
 ### Folder Organization
-<img src="./Screenshots/folder_view.png" width="300" alt="Folder Organization">
+<img src="images/Folder.png" width="600" alt="Folder Organization">
 
 ## Features
 
