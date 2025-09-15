@@ -2,7 +2,7 @@
 
 A comic book reader for iPad and iPhone.
 
-**⚠️ This project is currently under development.**
+**This project is under development.**
 
 ## App Icon
 
